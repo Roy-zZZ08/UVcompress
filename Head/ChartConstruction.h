@@ -347,20 +347,6 @@ void InitializeAtlasCharts
 		midBBox[1] /= height;
 		atlasCharts[i].gridOrigin = midBBox;
 	}
-
-	for (int i = 0; i < atlasCharts.size(); i++)
-	{
-		std::vector< int >& boundaryHalfEdges = atlasCharts[i].boundaryHalfEdges;
-		for (int t = 0; t < atlasCharts[i].meshTriangleIndices.size(); t++)
-		{
-			int tIndex = atlasCharts[i].meshTriangleIndices[t];
-			for (int k = 0; k < 3; k++)
-			{
-				if (isBoundaryHalfEdge[3 * tIndex + k])
-					boundaryHalfEdges.push_back(3 * t + k);
-			}
-		}
-	}
 }
 
 void Initialize
