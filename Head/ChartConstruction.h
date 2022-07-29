@@ -3,6 +3,7 @@
 
 #include "TexturedMesh.h"
 #include "Atlas.h"
+#include "Util.h"
 
 #include <queue>
 #include <set>
@@ -338,7 +339,7 @@ void InitializeAtlasCharts
 		midBBox[0] *= width;
 		midBBox[1] *= height;
 		midBBox -= Point2D< double >(0.5, 0.5);
-		midBBox = Point2D< double >(floor(midBBox[0]), floor(midBBox[1]));
+		midBBox = Point2D< double >(floor(midBBox[0]), floor(midBBox[1])); //?
 		atlasCharts[i].originCoords[0] = (int)round(midBBox[0]);
 		atlasCharts[i].originCoords[1] = (int)round(midBBox[1]);
 
@@ -347,6 +348,76 @@ void InitializeAtlasCharts
 		midBBox[1] /= height;
 		atlasCharts[i].gridOrigin = midBBox;
 	}
+}
+
+// ----------------------------------------------------
+// InitializeGridChartsActiveNodes
+// ----------------------------------------------------
+
+//Node type : inactive(-1) , exterior (0), interior boundary (1), interior deep (2) hybryd (both deep and boundary for the solver)(3).
+//Cell type : inactive(-1) , boundary (0), interior (1).
+void InitializeGridChartsActiveNodes
+(
+	const int chartID,
+	const AtlasChart &atlasChart,
+	GridChart &gridChart
+)
+{
+	int width = gridChart.width;
+	int height = gridChart.height;
+	double cellSizeW = gridChart.cellSizeW;
+	double cellSizeH = gridChart.cellSizeH;
+
+	Image< int >& nodeType = gridChart.nodeType;
+	nodeType.resize(width, height);
+	for (int i = 0; i < nodeType.size(); i++) nodeType[i] = -1;
+
+	Image< int > nodeOwner;
+	nodeOwner.resize(width, height);
+
+	Image< int > &cellType = gridChart.cellType;
+	cellType.resize(width - 1, height - 1);
+	for (int i = 0; i < cellType.size(); i++) cellType[i] = -1;
+
+	Image< int > &triangleID = gridChart.triangleID;
+	triangleID.resize(width, height);
+	for (int i = 0; i < triangleID.size(); i++) triangleID[i] = -1;
+
+	Image< Point2D< double > > &barycentricCoords = gridChart.barycentricCoords;
+	barycentricCoords.resize(width, height);
+
+	// 1.Add interior texels
+	for (int t = 0; t < atlasChart.triangles.size(); t++)
+	{
+		Point2D< double > tPos[3];
+		for (int i = 0; i < 3; i++) tPos[i] = atlasChart.vertices[atlasChart.triangles[t][i]] - gridChart.corner;
+
+		int minCorner[2];
+		int maxCorner[2];
+		GetTriangleIntegerBBox(tPos, 1. / cellSizeW, 1. / cellSizeH, minCorner, maxCorner);
+
+		SquareMatrix< double, 2 > barycentricMap = GetBarycentricMap(tPos);
+
+		for (int j = minCorner[1]; j <= maxCorner[1]; j++) {
+			for (int i = minCorner[0]; i <= maxCorner[0]; i++) {
+				Point2D< double > texelPos = Point2D< double >(i * cellSizeW, j * cellSizeH) - tPos[0];
+				Point2D< double > barycentricCoord = barycentricMap * texelPos;
+				if (barycentricCoord[0] >= 0 && barycentricCoord[1] >= 0 && (barycentricCoord[0] + barycentricCoord[1]) <= 1)
+				{
+					if (nodeType(i, j) != -1) 
+						Miscellany::Throw("Node ( %d , %d ) in chart %d already covered", i, j, chartID);
+
+					nodeType(i, j) = 1;
+					triangleID(i, j) = atlasChart.meshTriangleIndices[t];
+					barycentricCoords(i, j) = barycentricCoord;
+				}
+			}
+		}
+		
+	}
+
+	// 2.Add texels adjacent to boundary cells;
+	int r;
 }
 
 void Initialize
@@ -375,6 +446,39 @@ void Initialize
 	numBoundaryVertices = lastBoundaryIndex;
 
 	InitializeAtlasCharts(atlasMesh, isBoundaryHalfEdge, width, height, atlasCharts);
+
+	std::vector< GridChart > gridCharts;
+	gridCharts.resize(atlasCharts.size());
+
+	for (int i = 0; i < atlasCharts.size(); i++)
+	{
+		double cellSizeW = 1. / width;
+		double cellSizeH = 1. / height;
+
+		int halfSize[2][2];
+
+		for (int c = 0; c < 2; c++)
+		{
+			if (c == 0)
+			{
+				halfSize[c][0] = (int)ceil((atlasCharts[i].gridOrigin[c] - atlasCharts[i].minCorner[c]) / cellSizeW);
+				halfSize[c][1] = (int)ceil((atlasCharts[i].maxCorner[c] - atlasCharts[i].gridOrigin[c]) / cellSizeW);
+				gridCharts[i].corner[c] = atlasCharts[i].gridOrigin[c] - cellSizeW * halfSize[c][0];
+			}
+			else
+			{
+				halfSize[c][0] = (int)ceil((atlasCharts[i].gridOrigin[c] - atlasCharts[i].minCorner[c]) / cellSizeH);
+				halfSize[c][1] = (int)ceil((atlasCharts[i].maxCorner[c] - atlasCharts[i].gridOrigin[c]) / cellSizeH);
+				gridCharts[i].corner[c] = atlasCharts[i].gridOrigin[c] - cellSizeH * halfSize[c][0];
+			}
+		}
+		
+		gridCharts[i].width = halfSize[0][0] + halfSize[0][1] + 1;
+		gridCharts[i].height = halfSize[1][0] + halfSize[1][1] + 1;
+		gridCharts[i].cellSizeW = cellSizeW;
+		gridCharts[i].cellSizeH = cellSizeH;
+		InitializeGridChartsActiveNodes(i, atlasCharts[i], gridCharts[i]);
+	}
 }
 
 #endif

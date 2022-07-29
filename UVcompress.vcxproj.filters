@@ -13,26 +13,23 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Include">
-      <UniqueIdentifier>{71087c95-dbd1-445d-a9ec-3fc105baf33f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Include\Src">
-      <UniqueIdentifier>{1ea5675e-90e2-459d-a698-dd19060c45a2}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="source.cpp">
+    <ClCompile Include="Source\source.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="TexturedMesh.h">
+    <ClInclude Include="Head\Atlas.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="ChartConstruction.h">
+    <ClInclude Include="Head\ChartConstruction.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Atlas.h">
+    <ClInclude Include="Head\TexturedMesh.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Head\Util.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

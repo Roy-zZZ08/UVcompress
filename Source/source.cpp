@@ -19,7 +19,7 @@ std::vector< AtlasChart > atlasCharts;
 int main()
 {
 
-    mesh.read("Resource/dolphin/dolphin_tri.obj", "Resource/dolphin/dolphin_Diffuse_low.jpg");
+   mesh.read("Resource/dolphin/dolphin_tri.obj", "Resource/dolphin/dolphin_Diffuse_low.jpg");
 
     Initialize(mesh, mesh.texture.width(), mesh.texture.height(), textureNodes, bilinearElementIndices, atlasCharts);
     

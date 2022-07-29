@@ -56,6 +56,22 @@ public:
 	std::vector< int > meshTriangleIndices;
 };
 
+class GridChart
+{
+public:
+	Point2D< double > corner;
+	double cellSizeW;
+	double cellSizeH;
+	int width;
+	int height;
+
+	Image< int > nodeType;
+	Image< int > cellType;
+
+	Image< int > triangleID;
+	Image< Point2D< double > > barycentricCoords;
+};
+
 class IndexedVector2D
 {
 public:
