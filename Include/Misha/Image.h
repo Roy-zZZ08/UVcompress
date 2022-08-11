@@ -46,6 +46,13 @@ struct Image
 	void resize(int w, int h);
 	void read(const char* fileName);
 	void write(const char* fileName) const;
+
+	void writeNodeType(const char* fileName) const;
+	void writeCellType(const char* fileName) const;
+	void writeTriangleID(const char* fileName) const;
+	void writeBarycentricCoords(const char* fileName) const;
+	void writeTexture(const char* fileName) const;
+
 	int width(void) const { return _width; }
 	int height(void) const { return _height; }
 	int size(void) const { return _width * _height; }
@@ -114,7 +121,76 @@ template< class Data > Image< Data >& Image< Data >::operator = (const Image& im
 	return *this;
 }
 template< class Data > void Image< Data >::read( const char* fileName ) { Miscellany::ErrorOut( "Image read not supported" ); }
-template< class Data > void Image< Data >::write( const char* fileName ) const { Miscellany::ErrorOut( "Image write not supported" ); }
+template< class Data > void Image< Data >::write( const char* fileName ) const 
+{ 
+	unsigned char* pixels = new unsigned char[_width * _height * 3];
+	for (int i = 0; i < _width; i++) for (int j = 0; j < _height; j++) for (int c = 0; c < 3; c++)
+	{
+
+		pixels[3 * (j * _width + i) + c] = (unsigned char)((*this)(i, j)*50 + 50);
+
+	}
+	ImageWriter::Write(fileName, pixels, _width, _height, 3);
+	delete[] pixels;
+}
+
+template< class Data > void Image< Data >::writeNodeType(const char* fileName) const
+{
+	unsigned char* pixels = new unsigned char[_width * _height * 3];
+	for (int i = 0; i < _width; i++) for (int j = 0; j < _height; j++) for (int c = 0; c < 3; c++)
+	{
+
+		pixels[3 * (j * _width + i) + c] = (unsigned char)((*this)(i, j) * 60 + 50);
+
+	}
+	ImageWriter::Write(fileName, pixels, _width, _height, 3);
+	delete[] pixels;
+}
+
+template< class Data > void Image< Data >::writeCellType(const char* fileName) const
+{
+	unsigned char* pixels = new unsigned char[_width * _height * 3];
+	for (int i = 0; i < _width; i++) for (int j = 0; j < _height; j++) for (int c = 0; c < 3; c++)
+	{
+
+		pixels[3 * (j * _width + i) + c] = (unsigned char)((*this)(i, _height - j - 1) * 60 + 50);
+
+	}
+	ImageWriter::Write(fileName, pixels, _width, _height, 3);
+	delete[] pixels;
+}
+template< class Data > void Image< Data >::writeTriangleID(const char* fileName) const
+{
+	unsigned char* pixels = new unsigned char[_width * _height * 3];
+	for (int i = 0; i < _width; i++) for (int j = 0; j < _height; j++) for (int c = 0; c < 3; c++)
+	{
+		int triangleID = (*this)(i, j);
+		pixels[3 * (j * _width + i) + c] = (unsigned char)((*this)(i, j)*10+100);
+
+	}
+	ImageWriter::Write(fileName, pixels, _width, _height, 3);
+	delete[] pixels;
+}
+template< class Data > void Image< Data >::writeBarycentricCoords(const char* fileName) const
+{
+	unsigned char* pixels = new unsigned char[_width * _height * 3];
+	for (int i = 0; i < _width; i++) for (int j = 0; j < _height; j++) for (int c = 0; c < 3; c++)
+	{
+		if (c == 2)pixels[3 * (j * _width + i) + c] = 0;
+		else pixels[3 * (j * _width + i) + c] = (unsigned char)std::min< int >(255, std::max< int >(0, (int)((*this)(i, j)[c] * 255.0 + 0.5)));
+	}
+
+	ImageWriter::Write(fileName, pixels, _width, _height, 3);
+	delete[] pixels;
+}
+
+template< class Data > void Image< Data >::writeTexture(const char* fileName) const
+{
+	unsigned char* pixels = new unsigned char[_width * _height * 3];
+	for (int i = 0; i < _width; i++) for (int j = 0; j < _height; j++) for (int c = 0; c < 3; c++) pixels[3 * (j * _width + i) + c] = (unsigned char)std::min< int >(255, std::max< int >(0, (int)((*this)(i, j)[c] * 255.f + 0.5f)));
+	ImageWriter::Write(fileName, pixels, _width, _height, 3);
+	delete[] pixels;
+}
 
 template<>
 void Image< Point3D< float > >::read( const char* fileName )
