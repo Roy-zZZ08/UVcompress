@@ -19,7 +19,7 @@ std::vector< AtlasChart > atlasCharts;
 int main()
 {
 
-   mesh.read("Resource/test/test.obj", "Resource/test/test.jpg");
+   mesh.read("Resource/test/test.obj", "Resource/test/test1.jpg");
 
     Initialize(mesh, mesh.texture.width(), mesh.texture.height(), textureNodes, bilinearElementIndices, atlasCharts);
     

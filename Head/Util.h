@@ -70,4 +70,28 @@ Point2D< double > FindFoot(Point2D< double > const pntStart, Point2D< double > c
 	return pFoot;
 }
 
+Point3D< float > BilinearSample(Image<Point3D< float > >& img, Point2D< double >index)
+{
+	Point2D< double > nearNode = Point2D< double >(round(index[0]), round(index[1]));
+	std::vector<Point2D< double > > cellCenters;
+	cellCenters.push_back(Point2D< double >(nearNode[0] - 0.5, nearNode[1] - 0.5));
+	cellCenters.push_back(Point2D< double >(nearNode[0] + 0.5, nearNode[1] - 0.5));
+	cellCenters.push_back(Point2D< double >(nearNode[0] + 0.5, nearNode[1] + 0.5));
+	cellCenters.push_back(Point2D< double >(nearNode[0] - 0.5, nearNode[1] + 0.5));
+
+	std::vector<Point3D< float > > colors;
+	colors.push_back(img(floor(cellCenters[0][0]), floor(cellCenters[0][1])));
+	colors.push_back(img(floor(cellCenters[1][0]), floor(cellCenters[1][1])));
+	colors.push_back(img(floor(cellCenters[2][0]), floor(cellCenters[2][1])));
+	colors.push_back(img(floor(cellCenters[3][0]), floor(cellCenters[3][1])));
+
+	Point3D< float > color1 = (float)(index[1] - cellCenters[0][1]) * colors[3] + (float)(1 - (index[1] - cellCenters[0][1])) * colors[0];
+	Point3D< float > color2 = (float)(index[1] - cellCenters[0][1]) * colors[2] + (float)(1 - (index[1] - cellCenters[0][1])) * colors[1];
+
+	Point3D< float > color3= (float)(index[0] - cellCenters[0][0]) * color2 + (float)(1 - (index[0] - cellCenters[0][0])) * color1;
+
+
+	return color3;
+}
+
 #endif
