@@ -266,14 +266,88 @@ void InitiallizeBoundaryVertices
 	for (int b = 0; b < boundaryHalfEdges.size(); b++)
 	{
 		int halfEdgeIndex = boundaryHalfEdges[b];
-		int i = halfEdgeIndex / 3;
-		int k = halfEdgeIndex % 3;
-		if (boundaryVerticesIndices.find(mesh.triangles[i][k]) == boundaryVerticesIndices.end())
-			boundaryVerticesIndices[mesh.triangles[i][k]] = lastBoundaryIndex++;
-		if (boundaryVerticesIndices.find(mesh.triangles[i][(k+1)%3]) == boundaryVerticesIndices.end())
-			boundaryVerticesIndices[mesh.triangles[i][(k+1)%3]] = lastBoundaryIndex++;
+		int tIndex = halfEdgeIndex / 3;
+		int kIndex = halfEdgeIndex % 3;
+		if (boundaryVerticesIndices.find(mesh.triangles[tIndex][kIndex]) == boundaryVerticesIndices.end())
+			boundaryVerticesIndices[mesh.triangles[tIndex][kIndex]] = lastBoundaryIndex++;
+		if (boundaryVerticesIndices.find(mesh.triangles[tIndex][(kIndex + 1) % 3]) == boundaryVerticesIndices.end())
+			boundaryVerticesIndices[mesh.triangles[tIndex][(kIndex + 1) % 3]] = lastBoundaryIndex++;
 	}
 }
+
+// ----------------------------------------------------
+// InitiallizeOppositeCoords
+// ----------------------------------------------------
+
+void InitiallizeOppositeCoords
+(
+	const AtlasMesh& atlasMesh,
+	std::vector< int >& boundaryHalfEdges,
+	const std::vector< int >& oppositeHalfEdge,
+	std::unordered_map< int, Point2D< double > >& boundaryVerticesNormal,
+	std::unordered_map< int, class OppositeCoord >& oppositeCoord
+)
+{
+	for (int b = 0; b < boundaryHalfEdges.size(); b++)
+	{
+		int halfEdgeIndex = boundaryHalfEdges[b];
+		int tIndex = halfEdgeIndex / 3;
+		int kIndex = halfEdgeIndex % 3;
+
+		Point2D< double > ePos[2];
+		ePos[0] = atlasMesh.vertices[atlasMesh.triangles[tIndex][kIndex]];
+		ePos[1] = atlasMesh.vertices[atlasMesh.triangles[tIndex][(kIndex + 1) % 3]];
+
+		Point2D< double > edgeNormal;
+		Point2D< double > edgeDirection = ePos[1] - ePos[0];
+		edgeNormal = Point2D< double >(edgeDirection[1], -edgeDirection[0]);
+		edgeNormal /= Point2D< double >::Length(edgeNormal);
+
+		int oppositeIndex = oppositeHalfEdge[halfEdgeIndex];
+		int oppositeTriIndex = oppositeIndex / 3;
+		int oppositeEdgeIndex = oppositeIndex % 3;
+		int oppositeChartID = atlasMesh.triangleChartIndex[oppositeTriIndex];
+		Point2D< double > oppositeEdgePos[2];
+		oppositeEdgePos[0] = atlasMesh.vertices[atlasMesh.triangles[oppositeTriIndex][oppositeEdgeIndex]];
+		oppositeEdgePos[1] = atlasMesh.vertices[atlasMesh.triangles[oppositeTriIndex][(oppositeEdgeIndex + 1) % 3]];
+		Point2D< double > oppositeEdgeDirection = oppositeEdgePos[1] - oppositeEdgePos[0];
+		Point2D< double > oppositeEdgeInnerNormal = Point2D< double >(-oppositeEdgeDirection[1], oppositeEdgeDirection[0]);
+		oppositeEdgeInnerNormal /= Point2D< double >::Length(oppositeEdgeInnerNormal);
+		double unitRate = Point2D< double >::Length(oppositeEdgeDirection) / Point2D< double >::Length(edgeDirection);
+
+		// create opposite coordinate
+		OppositeCoord newCoord;
+		newCoord.center1 = (ePos[0] + ePos[1]) / 2;
+		newCoord.xAxis1 = edgeDirection / Point2D< double >::Length(edgeDirection);
+		newCoord.yAxis1 = edgeNormal;
+		newCoord.center2 = (oppositeEdgePos[0] + oppositeEdgePos[1]) / 2;
+		newCoord.xAxis2 = -unitRate * oppositeEdgeDirection / Point2D< double >::Length(oppositeEdgeDirection);
+		newCoord.yAxis2 = unitRate * oppositeEdgeInnerNormal;
+
+		oppositeCoord[halfEdgeIndex] = newCoord;
+
+		if (boundaryVerticesNormal.find(atlasMesh.triangles[tIndex][kIndex]) == boundaryVerticesNormal.end()) {
+			boundaryVerticesNormal[atlasMesh.triangles[tIndex][kIndex]] = edgeNormal;
+		}
+		else {
+			Point2D< double > avgNormal = boundaryVerticesNormal[atlasMesh.triangles[tIndex][kIndex]];
+			avgNormal += edgeNormal;
+			avgNormal /= Point2D< double >::Length(avgNormal);
+			boundaryVerticesNormal[atlasMesh.triangles[tIndex][kIndex]] = avgNormal;
+		}
+
+		if (boundaryVerticesNormal.find(atlasMesh.triangles[tIndex][(kIndex + 1) % 3]) == boundaryVerticesNormal.end()) {
+			boundaryVerticesNormal[atlasMesh.triangles[tIndex][(kIndex + 1) % 3]] = edgeNormal;
+		}
+		else {
+			Point2D< double > avgNormal = boundaryVerticesNormal[atlasMesh.triangles[tIndex][(kIndex + 1) % 3]];
+			avgNormal += edgeNormal;
+			avgNormal /= Point2D< double >::Length(avgNormal);
+			boundaryVerticesNormal[atlasMesh.triangles[tIndex][(kIndex + 1) % 3]] = avgNormal;
+		}
+	}
+}
+
 
 // ----------------------------------------------------
 // InitializeAtlasCharts
@@ -593,14 +667,19 @@ void InitializeGridChartsActiveNodes
 void Initialize
 (
 	TexturedMesh& mesh, const int width, const int height,
-	std::vector< TextureNodeInfo >& textureNodes,
-	std::vector< BilinearElementIndex >& cellNode,
+	Image< int >& nodeType,
+	Image< int >& cellType,
+	Image< int >& travelID,
+	Image< int >& triangleID,
+	Image< Point2D< double > >& barycentricCoords,
 	std::vector< AtlasChart >& atlasCharts
 )
 {
 	AtlasMesh atlasMesh;
 	std::vector< int > oppositeHalfEdge;
 	std::unordered_map< int, int > boundaryVerticesIndices;
+	std::unordered_map< int, Point2D< double > > boundaryVerticesNormal;
+	std::unordered_map< int, class OppositeCoord > oppositeCoord;
 	int numBoundaryVertices;
 	bool isClosedMesh;
 
@@ -615,59 +694,31 @@ void Initialize
 
 	numBoundaryVertices = lastBoundaryIndex;
 
+	InitiallizeOppositeCoords(atlasMesh, boundaryHalfEdges, oppositeHalfEdge, boundaryVerticesNormal, oppositeCoord);
+
 	InitializeAtlasCharts(atlasMesh, isBoundaryHalfEdge, width, height, atlasCharts);
 
+	double borderWidth = 0.04;
+	int patchSize = 25;
+	
 	std::vector< GridChart > gridCharts;
 	gridCharts.resize(atlasCharts.size());
-
-	/*
-	for (int i = 0; i < atlasCharts.size(); i++)
-	{
-		double cellSizeW = 1. / width;
-		double cellSizeH = 1. / height;
-
-		int halfSize[2][2];
-
-		for (int c = 0; c < 2; c++)
-		{
-			if (c == 0)
-			{
-				halfSize[c][0] = (int)ceil((atlasCharts[i].gridOrigin[c] - atlasCharts[i].minCorner[c]) / cellSizeW);
-				halfSize[c][1] = (int)ceil((atlasCharts[i].maxCorner[c] - atlasCharts[i].gridOrigin[c]) / cellSizeW);
-				gridCharts[i].corner[c] = atlasCharts[i].gridOrigin[c] - cellSizeW * halfSize[c][0];
-			}
-			else
-			{
-				halfSize[c][0] = (int)ceil((atlasCharts[i].gridOrigin[c] - atlasCharts[i].minCorner[c]) / cellSizeH);
-				halfSize[c][1] = (int)ceil((atlasCharts[i].maxCorner[c] - atlasCharts[i].gridOrigin[c]) / cellSizeH);
-				gridCharts[i].corner[c] = atlasCharts[i].gridOrigin[c] - cellSizeH * halfSize[c][0];
-			}
-		}
-
-		gridCharts[i].width = halfSize[0][0] + halfSize[0][1] + 1;
-		gridCharts[i].height = halfSize[1][0] + halfSize[1][1] + 1;
-		gridCharts[i].cellSizeW = cellSizeW;
-		gridCharts[i].cellSizeH = cellSizeH;
-		InitializeGridChartsActiveNodes(i, atlasCharts[i], gridCharts[i]);
-	}
-	*/
 
 	double cellSizeW = 1. / width;
 	double cellSizeH = 1. / height;
 
-	Image< int > nodeType;
 	nodeType.resize(width + 1, height + 1);
 	for (int i = 0; i < nodeType.size(); i++) nodeType[i] = -1;
 
-	Image< int > cellType;
 	cellType.resize(width, height);
 	for (int i = 0; i < cellType.size(); i++) cellType[i] = -1;
 
-	Image< int > triangleID;
+	travelID.resize(width, height);
+	for (int i = 0; i < travelID.size(); i++) travelID[i] = -1;
+
 	triangleID.resize(width + 1, height + 1);
 	for (int i = 0; i < triangleID.size(); i++) triangleID[i] = -1;
 
-	Image< Point2D< double > > barycentricCoords;
 	barycentricCoords.resize(width + 1, height + 1);
 
 	Image< Point3D< float > > textureTest;
@@ -839,6 +890,25 @@ void Initialize
 					}
 				}
 			}
+
+			// 2.3 create security border
+
+			int eIndex1 = atlasMesh.triangles[atlasCharts[index].meshTriangleIndices[tIndex]][kIndex];
+			int eIndex2 = atlasMesh.triangles[atlasCharts[index].meshTriangleIndices[tIndex]][(kIndex + 1) % 3];
+
+			Point2D< double > quadPos[4];
+			quadPos[0] = ePos[0];
+			quadPos[1] = ePos[1];
+			quadPos[2] = ePos[1] + borderWidth * boundaryVerticesNormal[eIndex2];
+			quadPos[3] = ePos[0] + borderWidth * boundaryVerticesNormal[eIndex1];
+
+			GetTriangleIntegerBBox4(quadPos, 1. / cellSizeW, 1. / cellSizeH, minCorner, maxCorner);
+			for (int j = minCorner[1]; j <= maxCorner[1]; j++) for (int i = minCorner[0]; i <= maxCorner[0]; i++) {
+				Point2D< double > cellCenter = Point2D< double >((i + 0.5) / width, (j + 0.5) / height);
+				if (InsideQuad(quadPos, cellCenter)) {
+					travelID(i, j) = atlasCharts[index].meshTriangleIndices[tIndex] * 3 + kIndex;
+				}
+			}
 		}
 
 		// 3. Add interior cells
@@ -850,14 +920,18 @@ void Initialize
 				}
 			}
 		}
-
 	}
+
+	
 
 	std::string FileName = "./tmp/nodeType.jpg";
 	nodeType.writeNodeType(FileName.c_str());
 
 	FileName = "./tmp/cellType.jpg";
 	cellType.writeNodeType(FileName.c_str());
+
+	FileName = "./tmp/travelID.jpg";
+	travelID.writeTriangleID(FileName.c_str());
 
 	FileName = "./tmp/triangleID.jpg";
 	triangleID.writeTriangleID(FileName.c_str());
@@ -866,164 +940,239 @@ void Initialize
 	barycentricCoords.writeBarycentricCoords(FileName.c_str());
 
 	// generate patches
-	int patchSize = 150;
+	Image< Point3D< float > > patchImg;
+	patchImg.resize(width, height);
+	for (int i = 0; i < patchImg.size(); i++) patchImg[i] = Point3D< float >(0, 0, 0);
+
+	
 	Image< Point3D< float > > block;
 	block.resize(patchSize, patchSize);
 	Image< int > visit;
 	visit.resize(patchSize, patchSize);
-	for (int i = 0; i < visit.size(); i++) visit[i] = 0;
-
-	int startWidth = 838, startHeight = 690;
-	//int startWidth = 0, startHeight = 0;
 	
+	for (int j = 0; j < height; j++) for (int i = 0; i < width; i++) {
+		int iCell = i, jCell = mesh.texture.height() - 1 - j;
 
-	for (int i = 0; i < patchSize; i++) for (int j = 0; j < patchSize; j++) 
-	{
-		//// debug
-		
-		int iCell = i + startWidth, jCell = mesh.texture.height() - 1 - j - startHeight;
-		int j_UV = mesh.texture.height() - j - 1;
-		// interior cell
+		// interior
 		if (cellType(iCell, jCell) == 1) {
-			visit(i, j) = 1;
-			//block(i, j) = Point3D<float>(1.0, 1.0, 1.0);
-			block(i, j) = mesh.texture(i + startWidth, j + startHeight);
+			patchImg(i, j) = mesh.texture(i, j);
 		}
-			
-		// boundary
-		else if (cellType(iCell, jCell) == 0)
-		{
-			// find the triangle
-			std::vector< Point2D< int > > nearNode;
-			nearNode.push_back(Point2D< int >(iCell,	 jCell    ));
-			nearNode.push_back(Point2D< int >(iCell + 1, jCell    ));
-			nearNode.push_back(Point2D< int >(iCell + 1, jCell + 1));
-			nearNode.push_back(Point2D< int >(iCell,	 jCell + 1));
-
-			int tIndex = -1;
-			for (int n = 0; n < nearNode.size(); n++) {
-				if (nodeType(nearNode[n][0], nearNode[n][1]) == 1 || nodeType(nearNode[n][0], nearNode[n][1]) == 0) {
-					tIndex = triangleID(nearNode[n][0], nearNode[n][1]);
-					break;
-				}
+		// exterior or boundary in safe border
+		else if (travelID(iCell, jCell) != -1) {
+			OppositeCoord newCoord = oppositeCoord[travelID(iCell, jCell)];
+			Point2D< double > tCellCenter = Point2D< double >((iCell + 0.5) / mesh.texture.width(), (jCell + 0.5) / mesh.texture.height());
+			Point2D< double > coord1 = Point2D< double >(Point2D< double >::Dot(tCellCenter - newCoord.center1, newCoord.xAxis1), Point2D< double >::Dot(tCellCenter - newCoord.center1, newCoord.yAxis1));
+			Point2D< double > coord2 = newCoord.center2 + coord1[0] * newCoord.xAxis2 + coord1[1] * newCoord.yAxis2;
+			if (coord2[0] > 0 && coord2[0] < 1 && coord2[1]>0 && coord2[1] < 1) {
+				Point2D< double > newPos = Point2D< double >(coord2[0] * mesh.texture.width(), round(coord2[1] * mesh.texture.height()));
+				Point2D< double > tTexturePos = Point2D< double >(newPos[0], mesh.texture.height() - newPos[1] - 1);
+				patchImg(i, j) = BilinearSample(mesh.texture, tTexturePos);
 			}
-			if (tIndex == -1) Miscellany::Throw("No node inside triangle");
-
-			int chartID = atlasMesh.triangleChartIndex[tIndex];
-			Point2D< double > tPos[3];
-			for (int i = 0; i < 3; i++) tPos[i] = atlasCharts[chartID].vertices[atlasCharts[chartID].triangles[atlasMesh.triangleIndexInChart[tIndex]][i]];
-			
-			Point2D< double > cellCenter((iCell + 0.5) / mesh.texture.width(), (jCell + 0.5) / mesh.texture.height());
-
-			SquareMatrix< double, 2 > barycentricMap = GetBarycentricMap(tPos);
- 			Point2D< double > barycentricCoord = barycentricMap * (cellCenter-tPos[0]);
-			
-			// cell center inside triangle
-			if (barycentricCoord[0] >= 0 && barycentricCoord[1] >= 0 && (barycentricCoord[0] + barycentricCoord[1]) <= 1)
-			{
-				visit(i, j) = 1;
-				block(i, j) = mesh.texture(i + startWidth, j + startHeight);
-			}
-			else
-			{
-				// find belong edge index
-
-				Point3D< double > barycentricCoord3 = Point3D< double >(1. - barycentricCoord[0] - barycentricCoord[1], barycentricCoord[0], barycentricCoord[1]);
-				Point2D< double > ePos[2];
-				double minDis = 1;
-				int edgeIndex = -1;
-				if (fabs(barycentricCoord3[0] + barycentricCoord3[1] - 1) < minDis) {
-					minDis = fabs(barycentricCoord3[0] + barycentricCoord3[1] - 1);
-					edgeIndex = 0; ePos[0] = tPos[0]; ePos[1] = tPos[1];
-					block(i, j) = Point3D<float>(1.0, 0.0, 0.0);
-				}
-				if (fabs(barycentricCoord3[1] + barycentricCoord3[2] - 1) < minDis) {
-					minDis = fabs(barycentricCoord3[1] + barycentricCoord3[2] - 1);
-					edgeIndex = 1; ePos[0] = tPos[1]; ePos[1] = tPos[2];
-					block(i, j) = Point3D<float>(0.0, 1.0, 0.0);
-				}
-				if (fabs(barycentricCoord3[2] + barycentricCoord3[0] - 1) < minDis) {
-					minDis = fabs(barycentricCoord3[2] + barycentricCoord3[0] - 1);
-					edgeIndex = 2; ePos[0] = tPos[2]; ePos[1] = tPos[0];
-					block(i, j) = Point3D<float>(0.0, 0.0, 1.0);
-				}
-
-				// find foot point
-				Point2D< double > footPoint = FindFoot(ePos[0], ePos[1], cellCenter);
-				Point2D< double > edgeDirection = ePos[1] - ePos[0];
-				Point2D< double > edgeNormal = Point2D< double >(edgeDirection[1], -edgeDirection[0]);
-				edgeNormal /= Point2D< double >::Length(edgeNormal);
-				double h = Point2D< double >::Length(cellCenter - footPoint);
-
-				// find opposite
-				int oppositeIndex = oppositeHalfEdge[tIndex * 3 + edgeIndex];
-				int oppositeTriIndex = oppositeIndex / 3;
-				int oppositeEdgeIndex = oppositeIndex % 3;
-				int oppositeChartID = atlasMesh.triangleChartIndex[oppositeTriIndex];
-				Point2D< double > oppositeEdgePos[2];
-				oppositeEdgePos[0] = atlasCharts[oppositeChartID].vertices[atlasCharts[oppositeChartID].triangles[atlasMesh.triangleIndexInChart[oppositeTriIndex]][oppositeEdgeIndex]];
-				oppositeEdgePos[1] = atlasCharts[oppositeChartID].vertices[atlasCharts[oppositeChartID].triangles[atlasMesh.triangleIndexInChart[oppositeTriIndex]][(oppositeEdgeIndex + 1) % 3]];
-				Point2D< double > oppositeEdgeDirection = oppositeEdgePos[1] - oppositeEdgePos[0];
-				Point2D< double > oppositeEdgeInnerNormal = Point2D< double >(-oppositeEdgeDirection[1], oppositeEdgeDirection[0]);
-				oppositeEdgeInnerNormal /= Point2D< double >::Length(oppositeEdgeInnerNormal);
-
-				double unitRate = Point2D< double >::Length(oppositeEdgeDirection) / Point2D< double >::Length(edgeDirection);
-
-				double cutPos = 0.0;
-				if (ePos[0][0] == ePos[1][0]) cutPos = (footPoint[1] - ePos[0][1]) / (ePos[1][1] - ePos[0][1]);
-				else						  cutPos = (footPoint[0] - ePos[0][0]) / (ePos[1][0] - ePos[0][0]);
-
-				Point2D< double > oppositePntPos = cutPos * oppositeEdgePos[0] + (1. - cutPos) * oppositeEdgePos[1];
-
-				Point2D< double > startPos = oppositePntPos + oppositeEdgeInnerNormal * unitRate * h;
-
-				Point2D< double > texturePos = Point2D< double >(startPos[0] * mesh.texture.width(), (1 - startPos[1]) * mesh.texture.height() - 1);
-				
-				// BilinearSample
-				block(i, j) = BilinearSample(mesh.texture, texturePos);
-
-				Point2D< double > xAxis1, yAxis1, xAxis2, yAxis2;
-				xAxis1 = edgeDirection / Point2D< double >::Length(edgeDirection);
-				yAxis1 = edgeNormal;
-				xAxis2 = -unitRate * oppositeEdgeDirection / Point2D< double >::Length(oppositeEdgeDirection);
-				yAxis2 =  unitRate * oppositeEdgeInnerNormal;
-
-				
-				for (int ti = 0; ti < patchSize; ti++) for (int tj = 0; tj < patchSize; tj++)
-				{
-
-					int tiCell = ti + startWidth, tjCell = mesh.texture.height() - 1 - tj - startHeight;
-					if (cellType(tiCell, tjCell) == -1 && visit(ti, tj) == 0)
-					{
-						Point2D< double > tCellCenter = Point2D< double >((tiCell + 0.5) / mesh.texture.width(), (tjCell + 0.5) / mesh.texture.height());
-						Point2D< double > coord1 = Point2D< double >(Point2D< double >::Dot(tCellCenter - footPoint, xAxis1), Point2D< double >::Dot(tCellCenter - footPoint, yAxis1));
-						Point2D< double > coord2 = oppositePntPos + coord1[0] * xAxis2 + coord1[1] * yAxis2;
-						if (coord2[0] < 1 && coord2[1] < 1) {
-							Point2D< double > newPos = Point2D< double >(coord2[0] * mesh.texture.width(), round(coord2[1] * mesh.texture.height()));
-							if (cellType(round(newPos[0]), round(newPos[1])) != -1)
-							{
-								Point2D< double > tTexturePos = Point2D< double >(newPos[0],mesh.texture.height()-newPos[1]-1);
-								block(ti, tj) = BilinearSample(mesh.texture, tTexturePos);
-								visit(ti, tj) = 1;
-							}
-						}
-						
-						
-					}
-				}
-			}			
 		}
-
-		
+		// boundary center interior
+		else if (cellType(iCell, jCell) == 0) {
+			patchImg(i, j) = mesh.texture(i, j);
+		}
 	}
+
+	//int blockIndex = 0;
+	//for (int startHeight = 0; startHeight + patchSize <= height; startHeight += patchSize/5) {
+	//	for (int startWidth = 0; startWidth + patchSize <= width; startWidth += patchSize/5) {
+	//		for (int i = 0; i < block.size(); i++) block[i] = Point3D< float >(0, 0, 0);
+	//		for (int i = 0; i < visit.size(); i++) visit[i] = 0;
+	//		bool valid = true;
+	//		bool incellFlag = false;
+	//		for (int j = 0; j < patchSize; j++) for (int i = 0; i < patchSize; i++) {
+	//			int iCell = i + startWidth, jCell = mesh.texture.height() - 1 - j - startHeight;
+	//			if (cellType(iCell, jCell) == 1) incellFlag = true;
+	//			if (cellType(iCell, jCell) == -1 && travelID(iCell, jCell) == -1) {
+	//				valid = false;
+	//				goto outloop;
+	//			}
+	//		}
+	//		if (incellFlag == false) valid = false;
+	//	outloop:
+	//		if (valid) {
+	//			for (int j = 0; j < patchSize; j++) for (int i = 0; i < patchSize; i++)
+	//			{
+	//				int iCell = i + startWidth, jCell = mesh.texture.height() - 1 - j - startHeight;
+	//				// interior cell
+	//				if (cellType(iCell, jCell) == 1) {
+	//					visit(i, j) = 1;
+	//					block(i, j) = mesh.texture(i + startWidth, j + startHeight);
+	//				}
+	//				else if (travelID(iCell, jCell) != -1) {
+	//					OppositeCoord newCoord = oppositeCoord[travelID(iCell, jCell)];
+	//					Point2D< double > tCellCenter = Point2D< double >((iCell + 0.5) / mesh.texture.width(), (jCell + 0.5) / mesh.texture.height());
+	//					Point2D< double > coord1 = Point2D< double >(Point2D< double >::Dot(tCellCenter - newCoord.center1, newCoord.xAxis1), Point2D< double >::Dot(tCellCenter - newCoord.center1, newCoord.yAxis1));
+	//					Point2D< double > coord2 = newCoord.center2 + coord1[0] * newCoord.xAxis2 + coord1[1] * newCoord.yAxis2;
+	//					if (coord2[0] > 0 && coord2[0] < 1 && coord2[1]>0 && coord2[1] < 1) {
+	//						Point2D< double > newPos = Point2D< double >(coord2[0] * mesh.texture.width(), round(coord2[1] * mesh.texture.height()));
+	//						if (cellType(round(newPos[0]), round(newPos[1])) != -1)
+	//						{
+	//							Point2D< double > tTexturePos = Point2D< double >(newPos[0], mesh.texture.height() - newPos[1] - 1);
+	//							block(i, j) = BilinearSample(mesh.texture, tTexturePos);
+	//							visit(i, j) = 1;
+	//						}
+	//					}
+	//				}
+	//				// boundary but center in triangle
+	//				else if (cellType(iCell, jCell) == 0) {
+	//					/*visit(i, j) = 1;
+	//					block(i, j) = mesh.texture(i + startWidth, j + startHeight);*/
+	//				}
+	//				/*// boundary
+	//				else if (cellType(iCell, jCell) == 0)
+	//				{
+	//					// find the triangle
+	//					std::vector< Point2D< int > > nearNode;
+	//					nearNode.push_back(Point2D< int >(iCell, jCell));
+	//					nearNode.push_back(Point2D< int >(iCell + 1, jCell));
+	//					nearNode.push_back(Point2D< int >(iCell + 1, jCell + 1));
+	//					nearNode.push_back(Point2D< int >(iCell, jCell + 1));
+
+	//					int tIndex = -1;
+	//					for (int n = 0; n < nearNode.size(); n++) {
+	//						if (nodeType(nearNode[n][0], nearNode[n][1]) == 1 || nodeType(nearNode[n][0], nearNode[n][1]) == 0) {
+	//							tIndex = triangleID(nearNode[n][0], nearNode[n][1]);
+	//							break;
+	//						}
+	//					}
+	//					if (tIndex == -1) Miscellany::Throw("No node inside triangle");
+
+	//					int chartID = atlasMesh.triangleChartIndex[tIndex];
+	//					Point2D< double > tPos[3];
+	//					for (int i = 0; i < 3; i++) tPos[i] = atlasCharts[chartID].vertices[atlasCharts[chartID].triangles[atlasMesh.triangleIndexInChart[tIndex]][i]];
+	//					Point2D< double > cellCenter((iCell + 0.5) / mesh.texture.width(), (jCell + 0.5) / mesh.texture.height());
+	//					SquareMatrix< double, 2 > barycentricMap = GetBarycentricMap(tPos);
+	//					Point2D< double > barycentricCoord = barycentricMap * (cellCenter - tPos[0]);
+
+	//					// cell center inside triangle
+	//					// todo what if all boundary center inside triangle
+	//					if (barycentricCoord[0] >= 0 && barycentricCoord[1] >= 0 && (barycentricCoord[0] + barycentricCoord[1]) <= 1)
+	//					{
+	//						visit(i, j) = 1;
+	//						block(i, j) = mesh.texture(i + startWidth, j + startHeight);
+	//					}
+	//					else
+	//					{
+	//						// find belong edge index
+	//						
+	//						Point3D< double > barycentricCoord3 = Point3D< double >(1. - barycentricCoord[0] - barycentricCoord[1], barycentricCoord[0], barycentricCoord[1]);
+	//						Point2D< double > ePos[2];
+	//						double minDis = 1;
+	//						int edgeIndex = -1;
+	//						if (isBoundaryHalfEdge[tIndex * 3] && fabs(barycentricCoord3[0] + barycentricCoord3[1] - 1) < minDis) {
+	//							minDis = fabs(barycentricCoord3[0] + barycentricCoord3[1] - 1);
+	//							edgeIndex = 0; ePos[0] = tPos[0]; ePos[1] = tPos[1];
+	//							block(i, j) = Point3D<float>(1.0, 0.0, 0.0);
+	//						}
+	//						if (isBoundaryHalfEdge[tIndex * 3 + 1] && fabs(barycentricCoord3[1] + barycentricCoord3[2] - 1) < minDis) {
+	//							minDis = fabs(barycentricCoord3[1] + barycentricCoord3[2] - 1);
+	//							edgeIndex = 1; ePos[0] = tPos[1]; ePos[1] = tPos[2];
+	//							block(i, j) = Point3D<float>(0.0, 1.0, 0.0);
+	//						}
+	//						if (isBoundaryHalfEdge[tIndex * 3 + 2] && fabs(barycentricCoord3[2] + barycentricCoord3[0] - 1) < minDis) {
+	//							minDis = fabs(barycentricCoord3[2] + barycentricCoord3[0] - 1);
+	//							edgeIndex = 2; ePos[0] = tPos[2]; ePos[1] = tPos[0];
+	//							block(i, j) = Point3D<float>(0.0, 0.0, 1.0);
+	//						}
+
+
+	//						// find foot point
+	//						Point2D< double > footPoint = FindFoot(ePos[0], ePos[1], cellCenter);
+	//						Point2D< double > edgeDirection = ePos[1] - ePos[0];
+	//						Point2D< double > edgeNormal = Point2D< double >(edgeDirection[1], -edgeDirection[0]);
+	//						edgeNormal /= Point2D< double >::Length(edgeNormal);
+	//						double h = Point2D< double >::Length(cellCenter - footPoint);
+
+	//						// find opposite
+	//						int oppositeIndex = oppositeHalfEdge[tIndex * 3 + edgeIndex];
+	//						if (oppositeIndex == -1) {
+	//							valid = false;
+	//							continue;
+	//						}
+	//						int oppositeTriIndex = oppositeIndex / 3;
+	//						int oppositeEdgeIndex = oppositeIndex % 3;
+	//						int oppositeChartID = atlasMesh.triangleChartIndex[oppositeTriIndex];
+	//						Point2D< double > oppositeEdgePos[2];
+	//						oppositeEdgePos[0] = atlasCharts[oppositeChartID].vertices[atlasCharts[oppositeChartID].triangles[atlasMesh.triangleIndexInChart[oppositeTriIndex]][oppositeEdgeIndex]];
+	//						oppositeEdgePos[1] = atlasCharts[oppositeChartID].vertices[atlasCharts[oppositeChartID].triangles[atlasMesh.triangleIndexInChart[oppositeTriIndex]][(oppositeEdgeIndex + 1) % 3]];
+	//						Point2D< double > oppositeEdgeDirection = oppositeEdgePos[1] - oppositeEdgePos[0];
+	//						Point2D< double > oppositeEdgeInnerNormal = Point2D< double >(-oppositeEdgeDirection[1], oppositeEdgeDirection[0]);
+	//						oppositeEdgeInnerNormal /= Point2D< double >::Length(oppositeEdgeInnerNormal);
+	//						double unitRate = Point2D< double >::Length(oppositeEdgeDirection) / Point2D< double >::Length(edgeDirection);
+	//						double cutPos = 0.0;
+	//						if (ePos[0][0] == ePos[1][0]) cutPos = (footPoint[1] - ePos[0][1]) / (ePos[1][1] - ePos[0][1]);
+	//						else						  cutPos = (footPoint[0] - ePos[0][0]) / (ePos[1][0] - ePos[0][0]);
+
+	//						Point2D< double > oppositePntPos = cutPos * oppositeEdgePos[0] + (1. - cutPos) * oppositeEdgePos[1];
+
+	//						Point2D< double > startPos = oppositePntPos + oppositeEdgeInnerNormal * unitRate * h;
+
+	//						Point2D< double > texturePos = Point2D< double >(startPos[0] * mesh.texture.width(), (1 - startPos[1]) * mesh.texture.height() - 1);
+
+	//						// BilinearSample
+	//						visit(i, j) = 1;
+	//						block(i, j) = BilinearSample(mesh.texture, texturePos);
+
+	//						Point2D< double > xAxis1, yAxis1, xAxis2, yAxis2;
+	//						xAxis1 = edgeDirection / Point2D< double >::Length(edgeDirection);
+	//						yAxis1 = edgeNormal;
+	//						xAxis2 = -unitRate * oppositeEdgeDirection / Point2D< double >::Length(oppositeEdgeDirection);
+	//						yAxis2 = unitRate * oppositeEdgeInnerNormal;
+
+
+	//						for (int ti = 0; ti < patchSize; ti++) for (int tj = 0; tj < patchSize; tj++)
+	//						{
+
+	//							int tiCell = ti + startWidth, tjCell = mesh.texture.height() - 1 - tj - startHeight;
+	//							if (cellType(tiCell, tjCell) != 1 && visit(ti, tj) == 0 && travelID(tiCell, tjCell) == tIndex * 3 + edgeIndex)
+	//							{
+	//								Point2D< double > tCellCenter = Point2D< double >((tiCell + 0.5) / mesh.texture.width(), (tjCell + 0.5) / mesh.texture.height());
+	//								Point2D< double > coord1 = Point2D< double >(Point2D< double >::Dot(tCellCenter - footPoint, xAxis1), Point2D< double >::Dot(tCellCenter - footPoint, yAxis1));
+	//								Point2D< double > coord2 = oppositePntPos + coord1[0] * xAxis2 + coord1[1] * yAxis2;
+	//								if (coord2[0] > 0 && coord2[0] < 1 && coord2[1]>0 && coord2[1] < 1) {
+	//									Point2D< double > newPos = Point2D< double >(coord2[0] * mesh.texture.width(), round(coord2[1] * mesh.texture.height()));
+	//									if (cellType(round(newPos[0]), round(newPos[1])) != -1)
+	//									{
+	//										Point2D< double > tTexturePos = Point2D< double >(newPos[0], mesh.texture.height() - newPos[1] - 1);
+	//										block(ti, tj) = BilinearSample(mesh.texture, tTexturePos);
+	//										visit(ti, tj) = 1;
+	//									}
+	//								}
+
+
+	//							}
+	//						}
+	//					}
+	//				}
+	//				*/
+	//			}
+
+	//			bool flag = true;
+	//			for (int j = 0; j < patchSize; j++) for (int i = 0; i < patchSize; i++) {
+	//				if (visit(i, j) != 1) {
+	//					//flag = false;
+	//					break;
+	//				}
+	//			}
+	//			if (flag) {
+	//				for (int j = 0; j < patchSize; j++) for (int i = 0; i < patchSize; i++) {
+	//					patchImg(i + startWidth, j + startHeight) = block(i, j);
+	//				}
+	//				FileName = "./tmp/block" + std::to_string(blockIndex) + ".jpg";
+	//				blockIndex++;
+	//				//block.writeTexture(FileName.c_str());
+	//			}
+	//		}
+	//		
+	//	}
+	//}
+
 	
-	for (int i = 0; i < patchSize; i++) for (int j = 0; j < patchSize; j++)
-	{
-		if (visit(i, j) == 0)
-			block(i, j) = Point3D< float >(1.0, 1.0, 1.0);
-	}
-	FileName = "./tmp/Block.jpg";
-	block.writeTexture(FileName.c_str());
+	FileName = "./tmp/patchImg.jpg";
+	patchImg.writeTexture(FileName.c_str());
 }
 
 #endif

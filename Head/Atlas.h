@@ -3,6 +3,13 @@
 
 #include <Misha/Geometry.h>
 
+class OppositeCoord
+{
+public:
+	Point2D< double > center1, center2;
+	Point2D< double > xAxis1, yAxis1, xAxis2, yAxis2;
+};
+
 class TextureNodeInfo
 {
 public:

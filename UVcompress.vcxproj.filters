@@ -18,6 +18,30 @@
     <ClCompile Include="Source\source.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="Source\klt.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Block.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\convolve.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\error.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\klt_util.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\pnmio.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\pyramid.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\selectGoodFeatures.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Head\Atlas.h">
@@ -30,6 +54,33 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Head\Util.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Head\klt.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Head\base.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Head\Block.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Head\convolve.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Head\error.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Head\klt_util.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Head\Match.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Head\pnmio.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Head\pyramid.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

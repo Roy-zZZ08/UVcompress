@@ -39,6 +39,23 @@ void GetTriangleIntegerBBox3(Point2D< double > tPos[3], const double invCellSize
 	maxCorner[1] = static_cast< int >( ceil( fmaxy * invCellSizeH ));
 }
 
+void GetTriangleIntegerBBox4(Point2D< double > tPos[4], const double invCellSizeW, const double invCellSizeH, int minCorner[2], int maxCorner[2])
+{
+	double fminx = std::min< double >(std::min< double >(tPos[0][0], tPos[1][0]), std::min< double >(tPos[2][0], tPos[3][0]));
+	fminx = std::max< double >(fminx, 0.);
+	double fminy = std::min< double >(std::min< double >(tPos[0][1], tPos[1][1]), std::min< double >(tPos[2][1], tPos[3][1]));
+	fminy = std::max< double >(fminy, 0.);
+	double fmaxx = std::max< double >(std::max< double >(tPos[0][0], tPos[1][0]), std::max< double >(tPos[2][0], tPos[3][0]));
+	fmaxx = std::min< double >(fmaxx, 1.);
+	double fmaxy = std::max< double >(std::max< double >(tPos[0][1], tPos[1][1]), std::max< double >(tPos[2][1], tPos[3][1]));
+	fmaxy = std::min< double >(fmaxy, 1.);
+
+	minCorner[0] = static_cast<int>(floor(fminx * invCellSizeW));
+	minCorner[1] = static_cast<int>(floor(fminy * invCellSizeH));
+	maxCorner[0] = static_cast<int>(ceil(fmaxx * invCellSizeW));
+	maxCorner[1] = static_cast<int>(ceil(fmaxy * invCellSizeH));
+}
+
 SquareMatrix< double, 2 > GetBarycentricMap(Point2D< double > tPos[3])
 {
 	SquareMatrix< double, 2 > parametrizationMap;
@@ -94,4 +111,39 @@ Point3D< float > BilinearSample(Image<Point3D< float > >& img, Point2D< double >
 	return color3;
 }
 
+
+bool InsideQuad(Point2D< double > quadPos[4], Point2D< double > p)
+{
+	
+	Point2D< double > AB = quadPos[1] - quadPos[0];
+	Point2D< double > BC = quadPos[2] - quadPos[1];
+	Point2D< double > CD = quadPos[3] - quadPos[2];
+	Point2D< double > DA = quadPos[0] - quadPos[3];
+
+	int flag = -1;
+	double direction0 = Point2D< double >::Cross(AB, BC);
+	double direction1 = Point2D< double >::Cross(BC, CD);
+	double direction2 = Point2D< double >::Cross(CD, DA);
+	double direction3 = Point2D< double >::Cross(DA, AB);
+
+	if (direction0 * direction1 * direction2 * direction3) {
+		// convex polygon
+		Point2D< double > AP = p - quadPos[0];
+		Point2D< double > BP = p - quadPos[1];
+		Point2D< double > CP = p - quadPos[2];
+		Point2D< double > DP = p - quadPos[3];
+
+		if (Point2D< double >::Cross(AB, AP) > 0) return false;
+		if (Point2D< double >::Cross(BC, BP) > 0) return false;
+		if (Point2D< double >::Cross(CD, CP) > 0) return false;
+		if (Point2D< double >::Cross(DA, DP) > 0) return false;
+
+		return true;
+	}
+	else {
+		return true;
+	}
+
+	// todo Concave Polygon
+}
 #endif

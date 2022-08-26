@@ -368,6 +368,7 @@ struct Point2D
 
 	Real squareNorm( void ) const { return coords[0]*coords[0] + coords[1]*coords[1]; }
 	static Real Dot( const Point2D& p1 , const Point2D& p2 ){ return p1.coords[0]*p2.coords[0] + p1.coords[1]*p2.coords[1]; }
+	static Real Cross (const Point2D& p1, const Point2D& p2) { return p1.coords[0] * p2.coords[1] - p2.coords[0] * p1.coords[1]; }
 	static Real SquareNorm( const Point2D& p ){ return p.coords[0]*p.coords[0] + p.coords[1]*p.coords[1]; }
 	static Real Length( const Point2D& p ){ return (Real)sqrt( SquareNorm(p) ); }
 	Real coords[2];
