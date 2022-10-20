@@ -2,7 +2,7 @@
 
 // HOG feature
 // Parameters
-#define N_BINS 36   // Number of bins
+#define N_BINS 12   // Number of bins
 #define INF 1e9
 
 Mat Hog(const Mat& img)
@@ -12,16 +12,19 @@ Mat Hog(const Mat& img)
     cvtColor(img, imgGray, COLOR_BGR2GRAY);
     // calculate gradients gx gy
     Mat gx, gy, mag, angle;
+
     Sobel(imgGray, gx, CV_32F, 1, 0, 1);
     Sobel(imgGray, gy, CV_32F, 0, 1, 1);
     // calculate gradient magnitude and direction
     cartToPolar(gx, gy, mag, angle, 1);
+    //cout << "mag" << mag << endl;
+    //cout << "angle" << angle << endl;
     for (int row = 0; row < img.rows; row++) {
         for (int col = 0; col < img.cols; col++) {
-            hog.at<float>(0, angle.at<float>(row, col) / 10) += mag.at<float>(row, col);
+            hog.at<float>(0, angle.at<float>(row, col) / (360 / N_BINS)) += mag.at<float>(row, col);
         }
     }
-    //cout << hog << endl;
+    //cout << "hog" << hog << endl;
     return hog;
 }
 
@@ -33,19 +36,20 @@ float guessTheta(const Mat& blockHog, const Mat& seedHog)
         tmpError = 0;
         for (int i = 0; i < N_BINS; i++) {
             tmpError += pow(blockHog.at<float>(0, i) - seedHog.at<float>(0, ((i + tmpTheta) % N_BINS)), 2);
+            //tmpError += abs(blockHog.at<float>(0, i) - seedHog.at<float>(0, ((i + tmpTheta) % N_BINS)));
         }
         if (tmpError < minError) {
             minError = tmpError;
             minTheta = tmpTheta;
         }
     }
-    return minTheta * 10;
+    return minTheta * (360 / N_BINS);
 }
 
 void Block::setColor(Mat& img, Vec3f color)
 {
-    for (int row = this->startHeight; row < this->startHeight + this->size; row++) {
-        for (int col = this->startWidth; col < this->startWidth + this->size; col++) {
+    for (int row = this->startHeight; row < this->startHeight + this->sizeHeight; row++) {
+        for (int col = this->startWidth; col < this->startWidth + this->sizeWidth; col++) {
             //img.at<Vec3b>(row, col)[0] = color[0]; //blue
             //img.at<Vec3b>(row, col)[1] = color[1]; //green
             img.at<Vec3b>(row, col)[2] = 200; //red
@@ -56,7 +60,7 @@ void Block::setColor(Mat& img, Vec3f color)
 void Block::addInitMatch(Point2f move, double angle, double scale)
 {
     //Match(Point2f center, Point2f move, double angle, double scale) 
-    Point2f center= Point2f(this->getStartWidth() + this->getSize() * 1.0 / 2, this->getStartHeight() + this->getSize() * 1.0 / 2);
+    Point2f center = Point2f(this->getStartWidth() + this->getSizeWidth() * 1.0 / 2, this->getStartHeight() + this->getSizeHeight() * 1.0 / 2);
     Match m(center, move, angle, scale);
     this->initMatchList.push_back(m);
 }
@@ -66,8 +70,8 @@ void Block::affineDeformation(Mat& img, Match match)
     Mat M = match.getMatrix();
     double* m = M.ptr<double>();
 
-    for (int row = -this->size / 2; row < this->size / 2; row++) {
-        for (int col = -this->size / 2; col < this->size / 2; col++) {
+    for (int row = -this->sizeHeight / 2; row < this->sizeHeight / 2; row++) {
+        for (int col = -this->sizeWidth / 2; col < this->sizeWidth / 2; col++) {
             int tmpCol = (int)(m[0] * col + m[1] * row + m[2]);
             int tmpRow = (int)(m[3] * col + m[4] * row + m[5]);
             if (tmpCol < img.cols && tmpCol >= 0 && tmpRow < img.rows && tmpRow >= 0) {
@@ -80,19 +84,17 @@ void Block::affineDeformation(Mat& img, Match match)
 
 }
 
-
-
 void Block::computeColorHistogram(const Mat& img)
 {
-    Mat imgBlock(this->size, this->size, CV_8UC3);
+    Mat imgBlock(this->sizeHeight, this->sizeWidth, CV_8UC3);
 
-    for (int i = 0; i < imgBlock.rows; i++){
-        for (int j = 0; j < imgBlock.cols; j++){
+    for (int i = 0; i < imgBlock.rows; i++) {
+        for (int j = 0; j < imgBlock.cols; j++) {
             imgBlock.at<Vec3b>(i, j) = img.at<Vec3b>(this->getStartHeight() + i, this->getStartWidth() + j);
         }
     }
 
-    Mat imgHSV,imgGray;
+    Mat imgHSV, imgGray;
     Mat mean, stddev;
     cvtColor(imgBlock, imgGray, COLOR_BGR2GRAY);
     meanStdDev(imgGray, mean, stddev);
@@ -105,7 +107,7 @@ void Block::computeColorHistogram(const Mat& img)
 
     // hue varies from 0 to 179, saturation from 0 to 255
     float hRanges[] = { 0, 180 };
-    float sRanges[] = { 0, 256 };
+    float sRanges[] = { 0, 255 };
     const float* ranges[] = { hRanges, sRanges };
 
     // Use the 0-th and 1-st channels

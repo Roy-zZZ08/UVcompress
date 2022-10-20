@@ -151,6 +151,7 @@
     <ClCompile Include="Source\pyramid.cpp" />
     <ClCompile Include="Source\selectGoodFeatures.cpp" />
     <ClCompile Include="Source\source.cpp" />
+    <ClCompile Include="Source\trackFeatures.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Head\Atlas.h" />
@@ -159,6 +160,7 @@
     <ClInclude Include="Head\ChartConstruction.h" />
     <ClInclude Include="Head\convolve.h" />
     <ClInclude Include="Head\error.h" />
+    <ClInclude Include="Head\init.h" />
     <ClInclude Include="Head\klt.h" />
     <ClInclude Include="Head\klt_util.h" />
     <ClInclude Include="Head\Match.h" />

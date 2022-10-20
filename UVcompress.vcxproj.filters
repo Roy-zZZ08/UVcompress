@@ -42,6 +42,9 @@
     <ClCompile Include="Source\selectGoodFeatures.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="Source\trackFeatures.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Head\Atlas.h">
@@ -81,6 +84,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Head\pyramid.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Head\init.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

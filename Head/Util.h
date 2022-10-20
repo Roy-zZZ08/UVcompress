@@ -146,4 +146,6 @@ bool InsideQuad(Point2D< double > quadPos[4], Point2D< double > p)
 
 	// todo Concave Polygon
 }
+
+
 #endif

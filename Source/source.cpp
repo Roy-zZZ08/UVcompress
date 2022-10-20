@@ -9,6 +9,7 @@
 #include "TexturedMesh.h"
 #include "ChartConstruction.h"
 #include "Atlas.h"
+#include "init.h"
 
 //-----klt---------
 #include "klt.h"
@@ -31,35 +32,23 @@ Image< int > nodeType;
 Image< int > cellType;
 Image< int > travelID;
 Image< int > triangleID;
+Image< Point3D< float > > patchImg;
 Image< Point2D< double > > barycentricCoords;
 
-int blocksize = 25;
-int ncols, nrows;
 
-uchar* patchInitImg(const string imgPath, int* ncols, int* nrows)
-{
-    uchar* ptr;
-    Mat img = imread(imgPath, 1);
-    if (img.empty()) {
-        fprintf(stderr, "Can not load image %s\n", imgPath);
-        return NULL;
-    }
-
-    *ncols = img.cols;
-    *nrows = img.rows;
-    ptr = (uchar*)malloc((*ncols) * (*nrows) * sizeof(char));
-    if (ptr == NULL)
-        KLTError("(imgRead) Memory not allocated");
-
-
-}
 
 int main()
 {
-   mesh.read("Resource/test2/test2.obj", "Resource/test2/test2.jpg");
+   // only support jpg
+   //mesh.read("Resource/dogBone/model.obj", "Resource/dogBone/texture.jpg");
 
-   Initialize(mesh, mesh.texture.width(), mesh.texture.height(), nodeType, cellType, travelID, triangleID, barycentricCoords, atlasCharts);
+   //Initialize(mesh, mesh.texture.width(), mesh.texture.height(), nodeType, cellType, travelID, triangleID, barycentricCoords, patchImg, atlasCharts);
 
-   
+   InitKlt();
+
+   //unsigned char* pixels = new unsigned char[_width * _height * 3];
+   //for (int i = 0; i < _width; i++) for (int j = 0; j < _height; j++) for (int c = 0; c < 3; c++) 
+   //    pixels[3 * (j * _width + i) + c] = (unsigned char)std::min< int >(255, std::max< int >(0, (int)((*this)(i, j)[c] * 255.f + 0.5f)));
+
    return 0;
 }

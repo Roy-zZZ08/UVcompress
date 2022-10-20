@@ -20,7 +20,6 @@
 using namespace std;
 
 static const int mindist = 10; /* minimum distance between selected features */
-static const int window_size = 13;
 static const int min_eigenvalue = 1;
 static const float min_determinant = 0.01f;
 static const float min_displacement = 0.1f;
@@ -33,9 +32,8 @@ static const float step_factor = 1.0f;
 static const KLT_BOOL sequentialMode = FALSE;
 static const KLT_BOOL lighting_insensitive = FALSE;
 /* for affine mapping*/
-static const int affineConsistencyCheck = 1 ;
-static const int affine_window_size = 13;
-static const int affine_max_iterations = 10;
+static const int affineConsistencyCheck = 1;
+static const int affine_max_iterations = 35;
 static const float affine_max_residue = 10.0;
 static const float affine_min_displacement = 0.01f;
 static const float affine_max_displacement_differ = 1.5f;
@@ -89,7 +87,7 @@ static void** _createArray2D(int ncols, int nrows, int nbytes)
  *
  */
 
-KLT_TrackingContext KLTCreateTrackingContext()
+KLT_TrackingContext KLTCreateTrackingContext(int blockSizeHeight, int blockSizeWidth)
 {
     KLT_TrackingContext tc;
 
@@ -98,8 +96,8 @@ KLT_TrackingContext KLTCreateTrackingContext()
 
     /* Set values to default values */
     tc->mindist = mindist;
-    tc->window_width = window_size;
-    tc->window_height = window_size;
+    tc->window_width = blockSizeWidth - 3;
+    tc->window_height = blockSizeHeight - 3;
     tc->sequentialMode = sequentialMode;
     tc->smoothBeforeSelecting = smoothBeforeSelecting;
     tc->writeInternalImages = writeInternalImages;
@@ -119,15 +117,15 @@ KLT_TrackingContext KLTCreateTrackingContext()
     tc->pyramid_last_grady = NULL;
     /* for affine mapping */
     tc->affineConsistencyCheck = affineConsistencyCheck;
-    tc->affine_window_width = affine_window_size;
-    tc->affine_window_height = affine_window_size;
+    tc->affine_window_width = blockSizeWidth + 1;
+    tc->affine_window_height = blockSizeHeight + 1;
     tc->affine_max_iterations = affine_max_iterations;
     tc->affine_max_residue = affine_max_residue;
     tc->affine_min_displacement = affine_min_displacement;
     tc->affine_max_displacement_differ = affine_max_displacement_differ;
 
     /* Change nPyramidLevels and subsampling */
-    KLTChangeTCPyramid(tc, search_range);
+    KLTChangeTCPyramid(tc, min(tc->window_width - 1, tc->window_height - 1));
 
     /* Update border, which is dependent upon  */
     /* smooth_sigma_fact, pyramid_sigma_fact, window_size, and subsampling */
@@ -172,7 +170,7 @@ KLT_FeatureList KLTCreateFeatureList(
     return(fl);
 }
 
-KLT_FeatureList initialAffineTrack(vector<Block*> blocks, int matchNum, int blockStartIndex)
+KLT_FeatureList initialAffineTrack(Block* block, int matchNum, int start, int end)
 {
     KLT_FeatureList fl;
     KLT_Feature first;
@@ -191,28 +189,26 @@ KLT_FeatureList initialAffineTrack(vector<Block*> blocks, int matchNum, int bloc
     fl->feature = (KLT_Feature*)(fl + 1);
     first = (KLT_Feature)(fl->feature + matchNum);
 
-
-    for (int index = 0; index < blocks.size(); index++) {
-        for (int j = 0; j < blocks[index]->initMatchList.size(); j++) {
-            fl->feature[i] = first + i;
-            fl->feature[i]->x = blocks[index]->getStartWidth() + blocks[index]->getSize() / 2;
-            fl->feature[i]->y = blocks[index]->getStartHeight() + blocks[index]->getSize() / 2;
-            fl->feature[i]->val = 0;
-            fl->feature[i]->aff_img = NULL;           /* initialization fixed by Sinisa Segvic */
-            fl->feature[i]->aff_img_gradx = NULL;
-            fl->feature[i]->aff_img_grady = NULL;
-            double* m = blocks[index]->initMatchList[j].getMatrix().ptr<double>();
-            fl->feature[i]->aff_Axx = m[0];
-            fl->feature[i]->aff_Axy = m[1];
-            fl->feature[i]->aff_x = m[2];
-            fl->feature[i]->aff_Ayx = m[3];
-            fl->feature[i]->aff_Ayy = m[4];
-            fl->feature[i]->aff_y = m[5];
-            fl->feature[i]->block_index = index + blockStartIndex;
-
-            i++;
-        }
+    for (int j = start; j < end; j++) {
+        fl->feature[i] = first + i;
+        fl->feature[i]->x = block->getStartWidth() + block->getSizeWidth() / 2;
+        fl->feature[i]->y = block->getStartHeight() + block->getSizeHeight() / 2;
+        fl->feature[i]->val = 0;
+        fl->feature[i]->aff_img = NULL;           /* initialization fixed by Sinisa Segvic */
+        fl->feature[i]->aff_img_gradx = NULL;
+        fl->feature[i]->aff_img_grady = NULL;
+        double* m = block->initMatchList[j].getMatrix().ptr<double>();
+        fl->feature[i]->aff_Axx = m[0];
+        fl->feature[i]->aff_Axy = m[1];
+        fl->feature[i]->aff_x = m[2];
+        fl->feature[i]->aff_Ayx = m[3];
+        fl->feature[i]->aff_Ayy = m[4];
+        fl->feature[i]->aff_y = m[5];
+        fl->feature[i]->block_index = block->getIndex();
+        fl->feature[i]->stddev = block->getStddev();
+        i++;
     }
+
     /* Return feature list */
     return(fl);
 }
@@ -449,9 +445,9 @@ void KLTUpdateTCBorder(
     window_hw = max(tc->window_width, tc->window_height) / 2;
 
     /* Find widths of convolution windows */
-    _KLTGetKernelWidths(_KLTComputeSmoothSigma(tc),&gauss_width, &gaussderiv_width);
+    _KLTGetKernelWidths(_KLTComputeSmoothSigma(tc), &gauss_width, &gaussderiv_width);
     smooth_gauss_hw = gauss_width / 2;
-    _KLTGetKernelWidths(_pyramidSigma(tc),&gauss_width, &gaussderiv_width);
+    _KLTGetKernelWidths(_pyramidSigma(tc), &gauss_width, &gaussderiv_width);
     pyramid_gauss_hw = gauss_width / 2;
 
     /* Compute the # of invalid pixels at each level of the pyramid.
