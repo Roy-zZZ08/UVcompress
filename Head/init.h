@@ -25,7 +25,6 @@ int blockSize;
 int blockSizeWidth, blockSizeHeight;
 int ncols, nrows;
 
-
 KLT_FeatureList testFl[16] = { nullptr };
 
 float NMSth; //相似性区域的非极大值抑制阈值
