@@ -158,6 +158,7 @@
     <ClInclude Include="Head\base.h" />
     <ClInclude Include="Head\Block.h" />
     <ClInclude Include="Head\ChartConstruction.h" />
+    <ClInclude Include="Head\CompressUV.h" />
     <ClInclude Include="Head\convolve.h" />
     <ClInclude Include="Head\error.h" />
     <ClInclude Include="Head\init.h" />
@@ -166,8 +167,10 @@
     <ClInclude Include="Head\Match.h" />
     <ClInclude Include="Head\pnmio.h" />
     <ClInclude Include="Head\pyramid.h" />
+    <ClInclude Include="Head\Remesh.h" />
     <ClInclude Include="Head\TexturedMesh.h" />
     <ClInclude Include="Head\Util.h" />
+    <ClInclude Include="Head\ValueDefine.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

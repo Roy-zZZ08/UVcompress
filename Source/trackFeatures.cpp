@@ -18,6 +18,7 @@
 #include "klt_util.h"	/* _KLT_FloatImage */
 #include "pyramid.h"	/* _KLT_Pyramid */
 
+
 extern int KLT_verbose;
 
 typedef float* _FloatWindow;
@@ -731,6 +732,8 @@ static void _am_computeIntensityDifferenceAffine(
 	float x2, float y2,      /* center of window in 2nd img */
 	float Axx, float Ayx, float Axy, float Ayy,    /* affine mapping */
 	int width, int height,  /* size of window */
+	Mat featureMask,
+	_FloatWindow featureMaskDiff,
 	_FloatWindow imgdiff)   /* output */
 {
 	register int hw = width / 2, hh = height / 2;
@@ -745,6 +748,11 @@ static void _am_computeIntensityDifferenceAffine(
 			mj = Ayx * i + Ayy * j;
 			g2 = _interpolate(x2 + mi, y2 + mj, img2);
 			*imgdiff++ = g1 - g2;
+			if (featureMask.at<uchar>(j + hh, i + hw) == 255) {
+				*featureMaskDiff++ = g1 - g2;
+			}
+			else
+				*featureMaskDiff++ = 0;
 		}
 	return;
 }
@@ -1002,11 +1010,13 @@ static int myTrackFeatureAffine(
 	float* Axy, float* Ayy,        /* used affine mapping */
 	float* error,
 	float* stddev,
-	float* affineCenterX, float* affineCenterY)
+	float* affineCenterX, float* affineCenterY,
+	Mat featureMask)
 {
 	// test
-
+	//blocks[blockIndex]->featureMaskInner.at<uchar>(row + blockHeight / 2, col + blockWidth / 2) == 255
 	_FloatWindow imgdiff, gradx, grady;
+	_FloatWindow featureMaskDiff;
 	float gxx, gxy, gyy, ex, ey, dx, dy;
 	int iteration = 0;
 	int status = 0;
@@ -1019,7 +1029,7 @@ static int myTrackFeatureAffine(
 	float** a;
 	float** T;
 	float one_plus_eps = 0.999f;   /* To prevent rounding errors */
-	float errorThread = 0.009 * (img1->ncols) * (img1->nrows);
+	float errorThread = 0.006 * (img1->ncols) * (img1->nrows);
 	float old_x2 = *x2;
 	float old_y2 = *y2;
 	KLT_BOOL convergence = FALSE;
@@ -1032,6 +1042,7 @@ static int myTrackFeatureAffine(
 
 	/* Allocate memory for windows */
 	imgdiff = _allocateFloatWindow(width, height);
+	featureMaskDiff = _allocateFloatWindow(width, height);
 	gradx = _allocateFloatWindow(width, height);
 	grady = _allocateFloatWindow(width, height);
 	T = _am_matrix(6, 6);
@@ -1082,13 +1093,13 @@ static int myTrackFeatureAffine(
 #endif
 		try {
 			_am_computeIntensityDifferenceAffine(img1, img2, x1, y1, *x2, *y2, *Axx, *Ayx, *Axy, *Ayy,
-				width, height, imgdiff);
+				width, height, featureMask, featureMaskDiff, imgdiff);
 		}
 		catch (int) {
 			status = KLT_OOB;
 			break;
 		}
-		*error = _sumAbsFloatWindow(imgdiff, width / 2 * 2, height / 2 * 2) / (pow(*stddev * *stddev, 1.5) + 1.0);
+		*error = _sumAbsFloatWindow(featureMaskDiff, width / 2 * 2, height / 2 * 2) / (pow(*stddev * *stddev, 1.5) + 1.0);
 		//printf("error %f\n", *error);
 		if (*error < errorThread) {
 			status = KLT_TRACKED;
@@ -1229,12 +1240,12 @@ static int myTrackFeatureAffine(
 		}
 		else {
 			_am_computeIntensityDifferenceAffine(img1, img2, x1, y1, *x2, *y2, *Axx, *Ayx, *Axy, *Ayy,
-				width, height, imgdiff);
+				width, height, featureMask, featureMaskDiff, imgdiff);
 		}
 #ifdef DEBUG_AFFINE_MAPPING
 		printf("iter = %d final_res = %f\n", iteration, _sumAbsFloatWindow(imgdiff, width, height) / (width * height));
 #endif 
-		* error = _sumAbsFloatWindow(imgdiff, width / 2 * 2, height / 2 * 2) / (pow(*stddev * *stddev, 1.5) + 1.0);
+		* error = _sumAbsFloatWindow(featureMaskDiff, width / 2 * 2, height / 2 * 2) / (pow(*stddev * *stddev, 1.5) + 1.0);
 		if (*error > errorThread)
 			status = KLT_LARGE_RESIDUE;
 
@@ -1411,8 +1422,8 @@ static int _am_trackFeatureAffine(
 			_KLTWriteAbsFloatImageToPGM(aff_diff_win, fname, 256.0);
 #endif
 
-			_am_computeIntensityDifferenceAffine(img1, img2, x1, y1, *x2, *y2, *Axx, *Ayx, *Axy, *Ayy,
-				width, height, imgdiff);
+			//_am_computeIntensityDifferenceAffine(img1, img2, x1, y1, *x2, *y2, *Axx, *Ayx, *Axy, *Ayy,
+			//	width, height, featureMask, imgdiff);
 #ifdef DEBUG_AFFINE_MAPPING    
 			aff_diff_win->data = imgdiff;
 			sprintf(fname, "./debug/kltimg_aff_diff_win%03d.%03d_3.pgm", glob_index, counter);
@@ -1512,8 +1523,8 @@ static int _am_trackFeatureAffine(
 				width, height, imgdiff);
 		}
 		else {
-			_am_computeIntensityDifferenceAffine(img1, img2, x1, y1, *x2, *y2, *Axx, *Ayx, *Axy, *Ayy,
-				width, height, imgdiff);
+			//_am_computeIntensityDifferenceAffine(img1, img2, x1, y1, *x2, *y2, *Axx, *Ayx, *Axy, *Ayy,
+			//	width, height, imgdiff);
 		}
 #ifdef DEBUG_AFFINE_MAPPING
 		printf("iter = %d final_res = %f\n", iteration, _sumAbsFloatWindow(imgdiff, width, height) / (width * height));
@@ -1858,7 +1869,8 @@ void myTrackAffine(
 	KLT_PixelType* img,
 	int ncols,
 	int nrows,
-	KLT_FeatureList featurelist)
+	KLT_FeatureList featurelist,
+	Mat featureMask)
 {
 	_KLT_FloatImage tmpimg, floatimg = nullptr;
 	_KLT_Pyramid pyramid, pyramid_gradx, pyramid_grady;
@@ -1930,6 +1942,7 @@ void myTrackAffine(
 	/* For each feature, do ... */
 	for (indx = 0; indx < featurelist->nFeatures; indx++) {
 
+		//blocks[blockIndex]->featureMaskInner.at<uchar>(row + blockHeight / 2, col + blockWidth / 2) == 255
 		printf("\rcompute feature affine [%.2f%%]", indx * 100.0 / (featurelist->nFeatures - 1));
 
 		xloc = featurelist->feature[indx]->x;
@@ -1948,7 +1961,6 @@ void myTrackAffine(
 		_am_getSubFloatImage(pyramid->img[0], xloc, yloc, featurelist->feature[indx]->aff_img);
 		_am_getSubFloatImage(pyramid_gradx->img[0], xloc, yloc, featurelist->feature[indx]->aff_img_gradx);
 		_am_getSubFloatImage(pyramid_grady->img[0], xloc, yloc, featurelist->feature[indx]->aff_img_grady);
-
 
 		/* affine tracking */
 		val = myTrackFeatureAffine(tc->affine_window_width / 2, tc->affine_window_height / 2,
@@ -1975,8 +1987,8 @@ void myTrackAffine(
 			&featurelist->feature[indx]->error,
 			&featurelist->feature[indx]->stddev,
 			&featurelist->feature[indx]->affineCenterX,
-			&featurelist->feature[indx]->affineCenterY
-
+			&featurelist->feature[indx]->affineCenterY,
+			featureMask
 		);
 		featurelist->feature[indx]->aff_x = xlocout;
 		featurelist->feature[indx]->aff_y = ylocout;

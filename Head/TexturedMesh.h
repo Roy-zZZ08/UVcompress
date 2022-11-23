@@ -36,27 +36,6 @@ public:
 
 		igl::readOBJ(meshName, V, TC, N, F, FTC, FN);
 
-		//std::cout << "Vertices: " << std::endl << V << std::endl;
-		//std::cout << "Faces:    " << std::endl << F << std::endl;
-
-		//int nowRow = TC.rows();
-		//TC.resize(nowRow + 3, 2);
-		//TC(nowRow, 0) = 0.5, TC(nowRow, 1) = 0.5;
-		//TC(nowRow + 1, 0) = 0.8, TC(nowRow + 1, 1) = 0.5;
-		//TC(nowRow + 2, 0) = 0.65, TC(nowRow + 2, 1) = 0.7;
-
-		//for (int i = 0; i < F.rows(); i++)
-		//{
-		//	for (int j = 0; j < 3; j++)
-		//	{
-		//		FTC(i, j) = nowRow + j;
-		//	}
-		//}
-
-		//const char* outMeshName = "tmp/outTest.obj";
-
-		//igl::writeOBJ(outMeshName, V, F, N, FN, TC, FTC);
-
 		vertices.resize(V.rows());
 		for (int i = 0; i < V.rows(); i++) vertices[i] = Point3D< double >(V(i, 0), V(i, 1), V(i, 2));
 

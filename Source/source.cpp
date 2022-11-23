@@ -6,10 +6,13 @@
 
 #include <opencv2/opencv.hpp>
 
-#include "TexturedMesh.h"
+#include "ValueDefine.h"
+
 #include "ChartConstruction.h"
+#include "CompressUV.h"
 #include "Atlas.h"
 #include "init.h"
+#include "Remesh.h"
 
 //-----klt---------
 #include "klt.h"
@@ -26,29 +29,21 @@
 using namespace std;
 using namespace cv;
 
-TexturedMesh mesh;
-vector< AtlasChart > atlasCharts;
-Image< int > nodeType;
-Image< int > cellType;
-Image< int > travelID;
-Image< int > triangleID;
-Image< Point3D< float > > patchImg;
-Image< Point2D< double > > barycentricCoords;
-
-
+const char* meshName = "Resource/pack/model.obj";
+const char* atlasName = "Resource/pack/texture.jpg";
 
 int main()
 {
-   // only support jpg
-   //mesh.read("Resource/dogBone/model.obj", "Resource/dogBone/texture.jpg");
+	// only support jpg
+	mesh.read(meshName, atlasName);
 
-   //Initialize(mesh, mesh.texture.width(), mesh.texture.height(), nodeType, cellType, travelID, triangleID, barycentricCoords, patchImg, atlasCharts);
+	Initialize(mesh, mesh.texture.width(), mesh.texture.height(), nodeType, cellType, travelID, triangleID, barycentricCoords, patchImg, atlasCharts);
 
-   InitKlt();
+	InitKlt();
 
-   //unsigned char* pixels = new unsigned char[_width * _height * 3];
-   //for (int i = 0; i < _width; i++) for (int j = 0; j < _height; j++) for (int c = 0; c < 3; c++) 
-   //    pixels[3 * (j * _width + i) + c] = (unsigned char)std::min< int >(255, std::max< int >(0, (int)((*this)(i, j)[c] * 255.f + 0.5f)));
+	FeatureRemesh(meshName);
+   
+	CompressUV(meshName);
 
-   return 0;
+	return 0;
 }

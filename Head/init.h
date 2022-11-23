@@ -10,6 +10,8 @@
 #include <Windows.h>
 #include <bitset>
 #include "Block.h"
+#include "ValueDefine.h"
+
 
 //   klt
 #include "error.h"
@@ -23,23 +25,25 @@ using namespace cv;
 int threadNum = 16;
 int blockSize;
 int blockSizeWidth, blockSizeHeight;
-int ncols, nrows;
 
 KLT_FeatureList testFl[16] = { nullptr };
 
 float NMSth; //相似性区域的非极大值抑制阈值
-float simiThread = 0.6; 
+float simiThread = 0.54; 
 float equalBlockThread = 1300;
-int minBlockSize = 10;
+int minBlockSize = 20;
 int edgeThread = 40; //Sobel算子计算后认为可以作为边缘的阈值
 int matchNum = 0;
-vector<Block*> blocks; //作为搜索起始点的区域信息 
+
+int featurePaddingX = 0; // feature mask往外扩的范围
+int featurePaddingY = 0;
+
 
 mutex mtx; // protect img
 mutex mtxSeed;
 
 const string imgPath = ".\\tmp\\";
-string imgName = "bunny";
+string imgName = "patchImg";
 
 //===========================================================================
 // Sobel边缘算子，计算得到8位单通道边缘强度信息图
@@ -77,6 +81,22 @@ Mat sobelEdge(Mat src)
 void InitBlocks(Mat src) 
 {
     Mat Sobel = sobelEdge(src);
+    cv::imshow("Sobel", Sobel);
+    //imwrite(imgPath + imgName + "_Sobel.png", Sobel);
+    //waitKey();
+
+    SobelEdge = Mat::zeros(Sobel.size(), Sobel.type());
+    for (int row = 0; row < Sobel.rows; row++) {
+        for (int col = 0; col < Sobel.cols; col++) {
+            if ((int)Sobel.at<uchar>(row, col) > edgeThread) {
+                SobelEdge.at<uchar>(row, col) = 255;
+            }
+        }
+    }
+    cv::imshow("TestMap", SobelEdge);
+    //imwrite(imgPath + imgName + "_TestMap.png", SobelEdge);
+    //waitKey();
+
     vector<pair<Point2i, Point2i> > searchReigon; // startPoint & width & height
     vector<vector<Point2i> > regionBoundary; // 候选区域的边缘信息
 
@@ -106,73 +126,52 @@ void InitBlocks(Mat src)
                             endPoint.x = nowPoint.x;
                         if (nowPoint.y > endPoint.y)
                             endPoint.y = nowPoint.y;
-                        if (nowPoint.x - 1 >= 0 && nowPoint.y - 1 >= 0 && (int)visitMap.at<uchar>(nowPoint.x - 1, nowPoint.y - 1) == 0 && (int)Sobel.at<uchar>(nowPoint.x - 1, nowPoint.y - 1) > edgeThread) {
 
-                            tmpPoints.push(Point2i(nowPoint.x - 1, nowPoint.y - 1));
-                            visitMap.at<uchar>(nowPoint.x - 1, nowPoint.y - 1) = 1;
-                        }
-                        if (nowPoint.x - 1 >= 0 && (int)visitMap.at<uchar>(nowPoint.x - 1, nowPoint.y) == 0 && (int)Sobel.at<uchar>(nowPoint.x - 1, nowPoint.y) > edgeThread) {
-
-                            tmpPoints.push(Point2i(nowPoint.x - 1, nowPoint.y));
-                            tmpBound.push_back(Point2i(nowPoint.x - 1, nowPoint.y));
-                            visitMap.at<uchar>(nowPoint.x - 1, nowPoint.y) = 1;
-                        }
-                        if (nowPoint.x - 1 >= 0 && nowPoint.y + 1 < Sobel.cols && (int)visitMap.at<uchar>(nowPoint.x - 1, nowPoint.y + 1) == 0 && (int)Sobel.at<uchar>(nowPoint.x - 1, nowPoint.y + 1) > edgeThread) {
-
-                            tmpPoints.push(Point2i(nowPoint.x - 1, nowPoint.y + 1));
-                            tmpBound.push_back(Point2i(nowPoint.x - 1, nowPoint.y + 1));
-                            visitMap.at<uchar>(nowPoint.x - 1, nowPoint.y + 1) = 1;
-                        }
-                        if (nowPoint.x + 1 < Sobel.rows && nowPoint.y - 1 >= 0 && (int)visitMap.at<uchar>(nowPoint.x + 1, nowPoint.y - 1) == 0 && (int)Sobel.at<uchar>(nowPoint.x + 1, nowPoint.y - 1) > edgeThread) {
-
-                            tmpPoints.push(Point2i(nowPoint.x + 1, nowPoint.y - 1));
-                            tmpBound.push_back(Point2i(nowPoint.x + 1, nowPoint.y - 1));
-                            visitMap.at<uchar>(nowPoint.x + 1, nowPoint.y - 1) = 1;
-                        }
-                        if (nowPoint.x + 1 < Sobel.rows && (int)visitMap.at<uchar>(nowPoint.x + 1, nowPoint.y) == 0 && (int)Sobel.at<uchar>(nowPoint.x + 1, nowPoint.y) > edgeThread) {
-
-                            tmpPoints.push(Point2i(nowPoint.x + 1, nowPoint.y));
-                            tmpBound.push_back(Point2i(nowPoint.x + 1, nowPoint.y));
-                            visitMap.at<uchar>(nowPoint.x + 1, nowPoint.y) = 1;
-                        }
-                        if (nowPoint.x + 1 < Sobel.rows && nowPoint.y + 1 < Sobel.cols && (int)visitMap.at<uchar>(nowPoint.x + 1, nowPoint.y + 1) == 0 && (int)Sobel.at<uchar>(nowPoint.x + 1, nowPoint.y + 1) > edgeThread) {
-
-                            tmpPoints.push(Point2i(nowPoint.x + 1, nowPoint.y + 1));
-                            tmpBound.push_back(Point2i(nowPoint.x + 1, nowPoint.y + 1));
-                            visitMap.at<uchar>(nowPoint.x + 1, nowPoint.y + 1) = 1;
-                        }
-                        if (nowPoint.y - 1 >= 0 && (int)visitMap.at<uchar>(nowPoint.x, nowPoint.y - 1) == 0 && (int)Sobel.at<uchar>(nowPoint.x, nowPoint.y - 1) > edgeThread) {
-
-                            tmpPoints.push(Point2i(nowPoint.x, nowPoint.y - 1));
-                            tmpBound.push_back(Point2i(nowPoint.x, nowPoint.y - 1));
-                            visitMap.at<uchar>(nowPoint.x, nowPoint.y - 1) = 1;
-                        }
-                        if (nowPoint.y + 1 < Sobel.cols && (int)visitMap.at<uchar>(nowPoint.x, nowPoint.y + 1) == 0 && (int)Sobel.at<uchar>(nowPoint.x, nowPoint.y + 1) > edgeThread) {
-
-                            tmpPoints.push(Point2i(nowPoint.x, nowPoint.y + 1));
-                            tmpBound.push_back(Point2i(nowPoint.x, nowPoint.y + 1));
-                            visitMap.at<uchar>(nowPoint.x, nowPoint.y + 1) = 1;
+                        // 遍历周围8个像素
+                        for (int ti = -1; ti < 2; ti++) for (int tj = -1; tj < 2; tj++) {
+                            Point2i newPoint = Point2i(nowPoint.x + ti, nowPoint.y + tj);
+                            // 检验是否为合法边界
+                            if (newPoint.x >= 0 && newPoint.y >= 0 && newPoint.x < Sobel.rows && newPoint.y < Sobel.cols) {
+                                if ((int)visitMap.at<uchar>(newPoint.x, newPoint.y) == 0 && (int)Sobel.at<uchar>(newPoint.x, newPoint.y) > edgeThread) {
+                                    tmpPoints.push(Point2i(newPoint.x, newPoint.y));
+                                    tmpBound.push_back(Point2i(newPoint.x, newPoint.y));
+                                    visitMap.at<uchar>(newPoint.x, newPoint.y) = 1;
+                                }
+                            }
                         }
                     }
+
                     int boundaryPad = 2;
+
+                    // 拓宽范围
+                    featurePaddingX = (endPoint.x - startPoint.x) / 6;
+                    featurePaddingY = (endPoint.y - startPoint.y) / 6;
+
+                    startPoint.x = startPoint.x - featurePaddingX;
+                    startPoint.y = startPoint.y - featurePaddingY;
+                    endPoint.x = endPoint.x + featurePaddingX;
+                    endPoint.y = endPoint.y + featurePaddingY;
+
                     if (startPoint.x > boundaryPad && startPoint.y > boundaryPad && endPoint.x < Sobel.rows - boundaryPad && endPoint.y < Sobel.cols - boundaryPad) {
                         Point2i tmpBlockSize = endPoint - startPoint;
-                        if (tmpBlockSize.x > minBlockSize && tmpBlockSize.y > minBlockSize && tmpBlockSize.x < Sobel.rows / 4 && tmpBlockSize.y < Sobel.cols / 4) {
+                        // 剔除过大或过小的block
+                        if (tmpBlockSize.x > minBlockSize + 2 * featurePaddingX && tmpBlockSize.y > minBlockSize + 2 * featurePaddingY && tmpBlockSize.x < Sobel.rows / 4 && tmpBlockSize.y < Sobel.cols / 4) {
                             Point2i kltRegionSize = Point2i((endPoint.x - startPoint.x + 2) / 2 * 2, ((endPoint.y - startPoint.y + 2) / 2 * 2));
                             searchReigon.push_back(make_pair(startPoint, kltRegionSize));
                             regionBoundary.push_back(tmpBound);
                         }
                     }
+
                 }
             }
         }
     }
 
-    // filter the regions
+    // filter the regions 剔除区域大小相近且相似度高的block
     vector<vector<Point2i> > finalBoundary; //保存有效区域的边界信息
 
-    int blocksIndex = 0;
-    blocks.push_back(new Block(blocksIndex++, searchReigon[0].second.x, searchReigon[0].second.y, searchReigon[0].first.x, searchReigon[0].first.y));
+    int tmpblocksIndex = 0;
+    blocks.push_back(new Block(tmpblocksIndex++, searchReigon[0].second.x, searchReigon[0].second.y, searchReigon[0].first.x, searchReigon[0].first.y));
     finalBoundary.push_back(regionBoundary[0]);
     blocks[0]->computeColorHistogram(src);
     for (int i = 1; i < searchReigon.size(); i++) {
@@ -181,17 +180,17 @@ void InitBlocks(Mat src)
         bool flag = false;
         for (int j = 0; j < blocks.size(); j++) {
             int compare_method = 3; // CV_COMP_BHATTACHARYYA
-            if (abs(blocks[j]->getSizeWidth() - tmpBlock->getSizeWidth()) < blocks[j]->getSizeWidth() / 3 && abs(blocks[j]->getSizeHeight() - tmpBlock->getSizeHeight()) < blocks[j]->getSizeHeight() / 3) {
+            if (abs(blocks[j]->getSizeWidth() - tmpBlock->getSizeWidth()) < blocks[j]->getSizeWidth() / 5 && abs(blocks[j]->getSizeHeight() - tmpBlock->getSizeHeight()) < blocks[j]->getSizeHeight() / 5) {
                 double simi = compareHist(blocks[j]->getHist(), tmpBlock->getHist(), compare_method);
                 //cout << "simi: block " << j << " region " << i << " :" << simi << endl;
-                if (simi < simiThread) {
+                 if (simi < simiThread) {
                     flag = true;
                     break;
                 }
             }
         }
         if (!flag) {
-            tmpBlock->index = blocksIndex++;
+            tmpBlock->index = tmpblocksIndex++;
             blocks.push_back(tmpBlock);
             finalBoundary.push_back(regionBoundary[i]);
         }
@@ -210,13 +209,16 @@ void InitBlocks(Mat src)
         cv::rectangle(result1, testRect, cv::Scalar(255, 0, 0));
     }
     //===================debug===========
-    cv::imshow("result1", result1);
-    imwrite(imgPath + imgName + "_start0.png", result1);
-    waitKey();
+    //cv::imshow("result1", result1);
+    //imwrite(imgPath + imgName + "_start0.png", result1);
+    //waitKey();
     //===================debug===========
     
     // 计算 feature mask
-    for (int index = 0; index < blocks.size(); index++) {
+     for (int index = 0; index < blocks.size(); index++) {
+
+        vector<Point2i>blockBoundaryPoints; //保存每个边界点
+
         Mat imgBlock(blocks[index]->getSizeHeight(), blocks[index]->getSizeWidth(), CV_8UC3);
         for (int i = 0; i < imgBlock.rows; i++) {
             for (int j = 0; j < imgBlock.cols; j++) {
@@ -234,22 +236,52 @@ void InitBlocks(Mat src)
                 idBlock.at<uchar>(i, j) = 255;
             }
         }
-        // 使用四个方向扫描线计算ID map
+        // 使用四个方向扫描线计算ID map 如果双向的特征窗口宽度始终小于阈值，则认为是线性无效特征
+        int validWidthThread = 5;
+        int validFlag[2] = { 0 }; // 记录X Y方向上是否有大于设定阈值宽度的特征
+
+        // debug
+        featurePaddingX = 0;
+        featurePaddingY = 0;
+
         for (int i = 0; i < idBlock.rows; i++) {
             int jleft = 0, jright = idBlock.cols - 1;
-            while (jleft < idBlock.cols && imgidBlock.at<uchar>(i, jleft) != 255) idBlock.at<uchar>(i, jleft++) = 0;
-            while (jright >= 0 && imgidBlock.at<uchar>(i, jright) != 255) idBlock.at<uchar>(i, jright--) = 0;
+            while (jleft + featurePaddingX < idBlock.cols && imgidBlock.at<uchar>(i, jleft + featurePaddingX) != 255) idBlock.at<uchar>(i, jleft++) = 0;
+            while (jright - featurePaddingX >= 0 && imgidBlock.at<uchar>(i, jright - featurePaddingX) != 255) idBlock.at<uchar>(i, jright--) = 0;
+            if (jright >= jleft + validWidthThread + 2 * featurePaddingX) validFlag[0] = 1;
         }
         for (int j = 0; j < idBlock.cols; j++) {
-            if (j == 57)
-                int debug = 0;
             int iup = 0, idown = idBlock.rows - 1;
-            while (iup < idBlock.rows && imgidBlock.at<uchar>(iup, j) != 255) idBlock.at<uchar>(iup++, j) = 0;
-            while (idown >= 0 && imgidBlock.at<uchar>(idown, j) != 255) idBlock.at<uchar>(idown--, j) = 0;
+            while (iup + featurePaddingY < idBlock.rows && imgidBlock.at<uchar>(iup + featurePaddingY, j) != 255) idBlock.at<uchar>(iup++, j) = 0;
+            while (idown - featurePaddingY >= 0 && imgidBlock.at<uchar>(idown - featurePaddingY, j) != 255) idBlock.at<uchar>(idown--, j) = 0;
+            if (idown >= iup + validWidthThread + 2 * featurePaddingY) validFlag[1] = 1;
         }
-        imshow("idBlock" + index, idBlock);
+
+        if (validFlag[0] != 1 || validFlag[1] != 1) {
+            blocks.erase(blocks.begin() + index);
+            finalBoundary.erase(finalBoundary.begin() + index);
+            index--;
+            continue;
+        }
+        
+        // 膨胀特征
+        Mat innerMask, outerMask;
+
+        dilate(idBlock, innerMask, Mat(), cv::Point(-1, -1), 1);
+        blocks[index]->featureMaskInner = innerMask;
+
+        imshow("idBlockInner" + index, innerMask);
+        //imwrite(imgPath + imgName + "_idBlock" + std::to_string(index) + ".png", idBlock);
         waitKey();
-        blocks[index]->featureID = idBlock;
+        
+        dilate(idBlock, outerMask, Mat(), cv::Point(-1, -1), 3);
+        blocks[index]->featureMaskOuter = outerMask;
+
+        imshow("idBlockOuter" + index, outerMask);
+        //imwrite(imgPath + imgName + "_idBlock" + std::to_string(index) + ".png", idBlock);
+        waitKey();
+
+        
 
         //===================debug===========
         Rect testRect;
@@ -408,7 +440,7 @@ uchar* ImgToGrayUchar(Mat src, int* ncols, int* nrows)
 // 对于初始化好的区域匹配结果，进行klt匹配优化其仿射匹配结果
 //===========================================================================
 
-void FindingSimi(int start, int end, uchar* img, int blockIndex, int threadIndex)
+void FindingSimi(int start, int end, uchar* img, int blockIndex, Mat featureMask, int threadIndex)
 {
     KLT_TrackingContext tc;
 
@@ -417,7 +449,7 @@ void FindingSimi(int start, int end, uchar* img, int blockIndex, int threadIndex
     tc = KLTCreateTrackingContext(blockSizeHeight, blockSizeWidth);
 
     testFl[threadIndex] = initialAffineTrack(blocks[blockIndex], tmpMatchNum, start, end);
-    myTrackAffine(tc, img, ncols, nrows, testFl[threadIndex]);
+    myTrackAffine(tc, img, ncols, nrows, testFl[threadIndex], featureMask);
 
     return;
 
@@ -488,34 +520,28 @@ void ApplyNMS(vector<vector<pair<pair<float, float>, pair<float, int> > > >& NMS
         blocks[i]->finalMatchList.push_back(Match(M));
     }
 
+    blocks[blockIndex]->initMatchList.clear();
 }
 
 //===========================================================================
 // KLT 处理起点
 //===========================================================================
 
-void InitKlt() 
+Mat src;
+
+void doKlt(int blockIndex) 
 {
-    // 读入图片
-    Mat src;
-    src = imread(imgPath + imgName + ".jpg", 1);
-
-    InitBlocks(src);
-    
-    int blockIndex = 1; //当前搜索的区域索引
     GenerateSeed(src, blockIndex);
-   
     uchar* initImg = ImgToGrayUchar(src, &ncols, &nrows);
-
     //==============================
     // 多线程进行klt匹配计算
 
     vector<thread> t(threadNum);
     int eachThreadCount = blocks[blockIndex]->initMatchList.size() / threadNum;
     for (int i = 0; i < threadNum - 1; i++) {
-        t[i] = thread(FindingSimi, i * eachThreadCount, (i + 1) * eachThreadCount, initImg, blockIndex, i);
+        t[i] = thread(FindingSimi, i * eachThreadCount, (i + 1) * eachThreadCount, initImg, blockIndex, blocks[blockIndex]->featureMaskOuter, i);
     }
-    t[threadNum - 1] = thread(FindingSimi, (threadNum - 1) * eachThreadCount, blocks[blockIndex]->initMatchList.size(), initImg, blockIndex, threadNum - 1);
+    t[threadNum - 1] = thread(FindingSimi, (threadNum - 1) * eachThreadCount, blocks[blockIndex]->initMatchList.size(), initImg, blockIndex, blocks[blockIndex]->featureMaskOuter, threadNum - 1);
     for (int i = 0; i < threadNum; i++) {
         t[i].join();
     }
@@ -538,33 +564,44 @@ void InitKlt()
     // Reconstructed Test
     Mat img1 = imread(imgPath + imgName + ".jpg", 1);
     Mat imgTest(nrows, ncols, CV_8UC3);
-    namedWindow("Test");
 
     for (int i = 0; i < blocks[blockIndex]->finalMatchList.size(); i++) {
         Mat M = blocks[blockIndex]->finalMatchList[i].getMatrix();
         double* m = M.ptr<double>();
         for (int row = -blockSizeHeight / 2; row < blockSizeHeight / 2; row++) {
             for (int col = -blockSizeWidth / 2; col < blockSizeWidth / 2; col++) {
-                int tmpCol = (int)(m[0] * col + m[1] * row + m[2]);
-                int tmpRow = (int)(m[3] * col + m[4] * row + m[5]);
-                if (tmpCol < ncols && tmpCol >= 0 && tmpRow < nrows && tmpRow >= 0) {
-                    //imgTest.at<Vec3b>(tmpRow, tmpCol) = img1.at<Vec3b>(row + blocks[blockIndex]->getStartHeight()+ blockSize / 2, col + blocks[blockIndex]->getStartWidth() + blockSize / 2);
-                    imgTest.at<Vec3b>(tmpRow, tmpCol) = img1.at<Vec3b>(tmpRow, tmpCol);
+                if (blocks[blockIndex]->featureMaskInner.at<uchar>(row + blockSizeHeight / 2, col + blockSizeWidth / 2) == 255) {
+                    int tmpCol = (int)(m[0] * col + m[1] * row + m[2]);
+                    int tmpRow = (int)(m[3] * col + m[4] * row + m[5]);
+                    if (tmpCol < ncols && tmpCol >= 0 && tmpRow < nrows && tmpRow >= 0) {
+                        //imgTest.at<Vec3b>(tmpRow, tmpCol) = img1.at<Vec3b>(row + blocks[blockIndex]->getStartHeight()+ blockSize / 2, col + blocks[blockIndex]->getStartWidth() + blockSize / 2);
+                        imgTest.at<Vec3b>(tmpRow, tmpCol) = img1.at<Vec3b>(row + blockSizeHeight / 2 + blocks[blockIndex]->getStartHeight(), col + blockSizeWidth / 2 + blocks[blockIndex]->getStartWidth());
+                    }
                 }
             }
         }
-        imshow("image", imgTest);
-        waitKey();
+        //imshow("image", imgTest);
+        //waitKey();
     }
-    
-    imwrite(imgPath + imgName + "_test.png", imgTest);
+
+    imwrite(imgPath + imgName + to_string(blockIndex) + "_test.png", imgTest);
     imshow("image", imgTest);
     waitKey();
-
-
-    //CreatingCharts();
-
 }
+
+void InitKlt() 
+{
+    // 读入图片
+    src = imread(imgPath + imgName + ".jpg", 1);
+    InitBlocks(src); 
+
+    //for (int bIndex = 0; bIndex < blocks.size(); bIndex++) {
+    //    cout << "new feature track id: " << bIndex << endl;
+    //    if(bIndex==0)
+    //    doKlt(bIndex);
+    //}
+
+ }
 
 float computeDiff(int index1, int index2, const Mat& img)
 {

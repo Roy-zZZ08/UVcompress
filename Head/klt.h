@@ -156,7 +156,8 @@ void myTrackAffine(
     KLT_PixelType* img,
     int ncols,
     int nrows,
-    KLT_FeatureList featurelist);
+    KLT_FeatureList featurelist,
+    Mat featureMask);
 
 void KLTSelectGoodFeatures(
     KLT_TrackingContext tc,

@@ -89,5 +89,14 @@
     <ClInclude Include="Head\init.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Head\CompressUV.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Head\ValueDefine.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Head\Remesh.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

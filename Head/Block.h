@@ -16,6 +16,7 @@ using namespace cv;
 using namespace std;
 
 class Block {
+
 public:
     Block(int _index, int _sizeHeight, int _sizeWidth, int _startHeight, int _startWidth, float _scale = 1)
     {
@@ -44,7 +45,8 @@ public:
     void addInitMatch(Point2f move, double angle, double scale);
 
     vector<Match> initMatchList, finalMatchList;
-    Mat featureID;
+    Mat featureMaskInner;
+    Mat featureMaskOuter; // ≈Ú’Õ∫ÛµƒMask
     int index;
     int equalBlock = -1;
 

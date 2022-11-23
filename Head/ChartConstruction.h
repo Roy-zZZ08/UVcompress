@@ -8,6 +8,7 @@
 #include <queue>
 #include <set>
 
+
 // ----------------------------------------------------
 // InitializeAtlasMesh
 // ----------------------------------------------------
@@ -704,8 +705,7 @@ void Initialize
 	InitializeAtlasCharts(atlasMesh, isBoundaryHalfEdge, width, height, atlasCharts);
 	printf("Initialize AtlasCharts Done \n");
 
-	double borderWidth = 0.02;
-	int patchSize = 25;
+	double borderWidth = 0.01;
 	
 	std::vector< GridChart > gridCharts;
 	gridCharts.resize(atlasCharts.size());
@@ -931,7 +931,7 @@ void Initialize
 
 	// generate patches
 	patchImg.resize(width, height);
-	for (int i = 0; i < patchImg.size(); i++) patchImg[i] = Point3D< float >(0, 0, 0);
+	for (int i = 0; i < patchImg.size(); i++) patchImg[i] = Point3D< float >(1, 1, 1);
 	
 	for (int j = 0; j < height; j++) for (int i = 0; i < width; i++) {
 		int iCell = i, jCell = mesh.texture.height() - 1 - j;
@@ -941,21 +941,21 @@ void Initialize
 			patchImg(i, j) = mesh.texture(i, j);
 		}
 		// exterior or boundary in safe border
-		else if (travelID(iCell, jCell) != -1) {
-			OppositeCoord newCoord = oppositeCoord[travelID(iCell, jCell)];
-			Point2D< double > tCellCenter = Point2D< double >((iCell + 0.5) / mesh.texture.width(), (jCell + 0.5) / mesh.texture.height());
-			Point2D< double > coord1 = Point2D< double >(Point2D< double >::Dot(tCellCenter - newCoord.center1, newCoord.xAxis1), Point2D< double >::Dot(tCellCenter - newCoord.center1, newCoord.yAxis1));
-			Point2D< double > coord2 = newCoord.center2 + coord1[0] * newCoord.xAxis2 + coord1[1] * newCoord.yAxis2;
-			if (coord2[0] > 0 && coord2[0] < 1 && coord2[1]>0 && coord2[1] < 1) {
-				Point2D< double > newPos = Point2D< double >(coord2[0] * mesh.texture.width(), round(coord2[1] * mesh.texture.height()));
-				Point2D< double > tTexturePos = Point2D< double >(newPos[0], mesh.texture.height() - newPos[1] - 1);
-				patchImg(i, j) = BilinearSample(mesh.texture, tTexturePos);
-			}
-		}
-		// boundary center interior
-		else if (cellType(iCell, jCell) == 0) {
-			patchImg(i, j) = mesh.texture(i, j);
-		}
+		//else if (travelID(iCell, jCell) != -1) {
+		//	OppositeCoord newCoord = oppositeCoord[travelID(iCell, jCell)];
+		//	Point2D< double > tCellCenter = Point2D< double >((iCell + 0.5) / mesh.texture.width(), (jCell + 0.5) / mesh.texture.height());
+		//	Point2D< double > coord1 = Point2D< double >(Point2D< double >::Dot(tCellCenter - newCoord.center1, newCoord.xAxis1), Point2D< double >::Dot(tCellCenter - newCoord.center1, newCoord.yAxis1));
+		//	Point2D< double > coord2 = newCoord.center2 + coord1[0] * newCoord.xAxis2 + coord1[1] * newCoord.yAxis2;
+		//	if (coord2[0] > 0 && coord2[0] < 1 && coord2[1]>0 && coord2[1] < 1) {
+		//		Point2D< double > newPos = Point2D< double >(coord2[0] * mesh.texture.width(), round(coord2[1] * mesh.texture.height()));
+		//		Point2D< double > tTexturePos = Point2D< double >(newPos[0], mesh.texture.height() - newPos[1] - 1);
+		//		patchImg(i, j) = BilinearSample(mesh.texture, tTexturePos);
+		//	}
+		//}
+		//// boundary center interior
+		//else if (cellType(iCell, jCell) == 0) {
+		//	patchImg(i, j) = mesh.texture(i, j);
+		//}
 	}
 
 	std::string FileName = "./tmp/nodeType.jpg";
