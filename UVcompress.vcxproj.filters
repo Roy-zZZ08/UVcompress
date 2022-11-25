@@ -98,5 +98,8 @@
     <ClInclude Include="Head\Remesh.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Head\CDTtest.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

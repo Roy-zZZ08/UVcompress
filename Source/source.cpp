@@ -26,6 +26,8 @@
 #include <algorithm>
 #include <Windows.h>
 
+#include "CDTtest.h"
+
 using namespace std;
 using namespace cv;
 
@@ -36,6 +38,8 @@ int main()
 {
 	// only support jpg
 	mesh.read(meshName, atlasName);
+
+	Test();
 
 	Initialize(mesh, mesh.texture.width(), mesh.texture.height(), nodeType, cellType, travelID, triangleID, barycentricCoords, patchImg, atlasCharts);
 

@@ -270,16 +270,16 @@ void InitBlocks(Mat src)
         dilate(idBlock, innerMask, Mat(), cv::Point(-1, -1), 1);
         blocks[index]->featureMaskInner = innerMask;
 
-        imshow("idBlockInner" + index, innerMask);
+        //imshow("idBlockInner" + index, innerMask);
         //imwrite(imgPath + imgName + "_idBlock" + std::to_string(index) + ".png", idBlock);
-        waitKey();
+        //waitKey();
         
         dilate(idBlock, outerMask, Mat(), cv::Point(-1, -1), 3);
         blocks[index]->featureMaskOuter = outerMask;
 
-        imshow("idBlockOuter" + index, outerMask);
+        //imshow("idBlockOuter" + index, outerMask);
         //imwrite(imgPath + imgName + "_idBlock" + std::to_string(index) + ".png", idBlock);
-        waitKey();
+        //waitKey();
 
         
 

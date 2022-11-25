@@ -8,6 +8,8 @@
 #include <igl/readOBJ.h>
 #include <igl/writeOBJ.h>
 
+#include "CDT\CDT.h"
+
 int  boundPointDis = 10; // 筛选边界点间的距离
 
 //Eigen::MatrixXd V, TC, N;
@@ -18,12 +20,49 @@ public:
 	int x;
 	int y;
 
-	myTmpPoint(int _x, int _y) :x(_x), y(_y) { }
+	int id;
+
+	myTmpPoint(int _x, int _y, int _id = -1) :x(_x), y(_y), id(_id) { }
 	bool operator<(const myTmpPoint& p) const {
 		if (this->x == p.x) return this->y < p.y;
 		else return this->x < p.x;
 	}
 
+};
+
+class InsertVert {
+public:
+
+	// geometry position
+	double x;
+	double y;
+	double z;
+
+	// uv position
+	double u;
+	double v;
+
+	int triId;
+
+	InsertVert() :x(0), y(0), z(0), u(0), v(0), triId(-1) {}
+
+	void ComputeGeoPos() {
+		// 对于新插入的边界点，根据重心坐标计算其几何上的位置
+		Point3D< double > tPos[3];
+		for (int i = 0; i < 3; i++) {
+			tPos[i][0] = V(F(triId, i), 0);
+			tPos[i][1] = V(F(triId, i), 1);
+			tPos[i][2] = V(F(triId, i), 2);
+		}
+		Point2D< double > barycentricCoord = barycentricCoords(u * ncols, v * nrows);
+		Point3D< double > newPos;
+
+		newPos = tPos[0] + barycentricCoord[0] * (tPos[1] - tPos[0]) + barycentricCoord[1] * (tPos[2] - tPos[0]);
+		x = newPos[0];
+		y = newPos[1];
+		z = newPos[2];
+
+	}
 };
 
 void FeatureRemesh(const char* meshName)
@@ -32,10 +71,15 @@ void FeatureRemesh(const char* meshName)
 
 	// test
 	Mat raw = imread(imgPath + imgName + ".jpg", 1);
+	nrows = raw.rows;
+	ncols = raw.cols;
 
 	for (int blockIndex = 0; blockIndex < blocks.size(); blockIndex++) {
 		set<myTmpPoint> bondaryPoints;
-		unordered_set<int>triangleList;
+		unordered_set<int> triangleList;
+		vector<InsertVert> insertVerts;
+		vector<Point2i> newBoundPoints;
+		set<myTmpPoint>  neighborTriVerts;
 
 		Mat featureMask = blocks[blockIndex]->featureMaskOuter;
 
@@ -47,17 +91,29 @@ void FeatureRemesh(const char* meshName)
 		for (int row = -blockHeight / 2; row < blockHeight / 2; row++) {
 			for (int col = -blockWidth / 2; col < blockWidth / 2; col++) {
 				if (blocks[blockIndex]->featureMaskOuter.at<uchar>(row + blockHeight / 2, col + blockWidth / 2) == 255) {
-					if (triangleID(col, nrows - row - 1) != -1) {
-						triangleList.insert(triangleID(col, nrows - row - 1));
+					int tmpCol = col + blockWidth / 2 + blocks[blockIndex]->getStartWidth();
+					int tmpRow = row + blockHeight / 2 + blocks[blockIndex]->getStartHeight();
+					if (triangleID(tmpCol, raw.rows - tmpRow - 1) != -1) {
+						triangleList.insert(triangleID(tmpCol, raw.rows - tmpRow - 1));
 					}
 				}
 			}
 		}
 
 		for (auto iter = triangleList.begin(); iter != triangleList.end(); iter++) {
+			for (int k = 0; k < 3; k++) {
+				double nowUV[2];
+				nowUV[0] = TC(FTC(*iter, k), 0);
+				nowUV[1] = TC(FTC(*iter, k), 1);
 
+				double nowPos[2]; //col row
+				nowPos[0] = nowUV[0] * raw.cols;
+				nowPos[1] = raw.rows - 1 - nowUV[1] * raw.rows;
+
+				neighborTriVerts.insert(myTmpPoint(nowPos[1] - blocks[blockIndex]->getStartHeight(), nowPos[0] - blocks[blockIndex]->getStartWidth(), *iter * 3 + k)); // row col
+				raw.at<Vec3b>(Point2i((int)nowPos[0], (int)nowPos[1])) = Vec3b(255, 0, 0);
+			}
 		}
-
 
 		for (int i = 0; i < blockHeight; i++) {
 			int jleft = 0, jright = blockWidth - 1;
@@ -79,12 +135,37 @@ void FeatureRemesh(const char* meshName)
 		}
 
 		// 筛选边界点
-		vector<Point2i> newBoundPoints;
+
 		for (auto it = bondaryPoints.begin(); it != bondaryPoints.end(); it++) {
+
+			int texelU = blocks[blockIndex]->getStartWidth() + (*it).y;
+			int texelV = nrows - 1 - (blocks[blockIndex]->getStartHeight() + (*it).x);
+
+			if (triangleID(texelU, texelV) == -1) continue; // 无几何定义
+
+			bool flag = FALSE;
+			for (auto it2 = neighborTriVerts.begin(); it2 != neighborTriVerts.end(); it2++) {
+				if (pow((*it).x - (*it2).x, 2) + pow((*it).y - (*it2).y, 2) < boundPointDis) {
+					flag = TRUE;
+					break;
+				}
+			}
+			if (flag) continue;
+
+			// 第一个点默认进行插入
 			if (it == bondaryPoints.begin()) {
+
+				InsertVert newInsertVert;
+				newInsertVert.u = texelU * 1.0 / ncols;
+				newInsertVert.v = texelV * 1.0 / nrows;
+				newInsertVert.triId = triangleID(texelU, texelV);
+				newInsertVert.ComputeGeoPos();
+				insertVerts.push_back(newInsertVert);
+
 				newBoundPoints.push_back(Point2i((*it).x, (*it).y));
 			}
 			else {
+				//  对于其他的候选点，要求与先前插入点存在一定距离并且在几何上有定义
 				bool flag = TRUE;
 				for (int i = 0; i < newBoundPoints.size(); i++) {
 					if (pow((*it).x - newBoundPoints[i].x, 2) + pow((*it).y - newBoundPoints[i].y, 2) < boundPointDis * boundPointDis) {
@@ -92,7 +173,18 @@ void FeatureRemesh(const char* meshName)
 						break;
 					}
 				}
-				if (flag) newBoundPoints.push_back(Point2i((*it).x, (*it).y));
+				if (flag) {
+
+					InsertVert newInsertVert;
+					newInsertVert.u = texelU * 1.0 / ncols;
+					newInsertVert.v = texelV * 1.0 / nrows;
+					newInsertVert.triId = triangleID(texelU, texelV);
+					newInsertVert.ComputeGeoPos();
+					insertVerts.push_back(newInsertVert);
+
+
+					newBoundPoints.push_back(Point2i((*it).x, (*it).y));
+				}
 			}
 		}
 
@@ -100,40 +192,99 @@ void FeatureRemesh(const char* meshName)
 			Point2i boundaryRed = Point2i(blocks[blockIndex]->getStartWidth() + newBoundPoints[i].y, blocks[blockIndex]->getStartHeight() + newBoundPoints[i].x);
 			raw.at<Vec3b>(boundaryRed) = Vec3b(0, 0, 255);
 		}
+
+		// 对于新插入的点，与一邻域点重新三角剖分
+		std::vector<CDT::V2d<double> > points;
+
+		for (auto it = neighborTriVerts.begin(); it != neighborTriVerts.end(); it++) {
+			points.push_back(CDT::V2d<double>::make((*it).x, (*it).y));
+		}
+		for (int i = 0; i < newBoundPoints.size(); i++) {
+			points.push_back(CDT::V2d<double>::make(newBoundPoints[i].x, newBoundPoints[i].y));
+		}
+
+		//std::vector<CustomEdge> edges = /*...*/;
+		CDT::Triangulation<double> cdt;
+		cdt.insertVertices(points);
+		cdt.eraseSuperTriangle();
+ 		int debug=0;
+
+		debug += 1;
+
+		TexturedMesh newMesh;
+		for (auto it = neighborTriVerts.begin(); it != neighborTriVerts.end(); it++) {
+			newMesh.vertices.push_back(Point3D<double>(V(F((*it).id / 3, (*it).id % 3), 0), V(F((*it).id / 3, (*it).id % 3), 1), V(F((*it).id / 3, (*it).id % 3), 2)));
+			newMesh.textureCoordinates.push_back(Point2D<double>(TC(FTC((*it).id / 3, (*it).id % 3), 0), TC(FTC((*it).id / 3, (*it).id % 3), 1)));
+		}
+		for (int i = 0; i < insertVerts.size(); i++) {
+			newMesh.vertices.push_back(Point3D<double>(insertVerts[i].x, insertVerts[i].y, insertVerts[i].z));
+			newMesh.textureCoordinates.push_back(Point2D<double>(insertVerts[i].u, insertVerts[i].v));
+		}
+		for (int i = 0; i < cdt.triangles.size(); i++) {
+			newMesh.triangles.push_back(TriangleIndex(cdt.triangles[i].vertices[0], cdt.triangles[i].vertices[1], cdt.triangles[i].vertices[2]));	
+		}
+
+		Eigen::MatrixXd newV, newTC, newN;
+		Eigen::MatrixXi newF, newFTC, newFN;
+
+		newV.resize(newMesh.vertices.size(), 3);
+		for (int i = 0; i < newMesh.vertices.size(); i++) for (int k = 0; k < 3; k++) {
+			newV(i, k) = newMesh.vertices[i][k];
+		}
+		newTC.resize(newMesh.textureCoordinates.size(), 2);
+		for (int i = 0; i < newMesh.textureCoordinates.size(); i++) for (int k = 0; k < 2; k++) {
+			newTC(i, k) = newMesh.textureCoordinates[i][k];
+		}
+		newN.resize(1, 3);
+		newN(0, 0) = 0.5; newN(0, 1) = 0.5; newN(0, 2) = 0.5;
+		newF.resize(newMesh.triangles.size(), 3);
+		for (int i = 0; i < newMesh.triangles.size(); i++) for (int k = 0; k < 3; k++) {
+			newF(i, k) = newMesh.triangles[i][k];
+		}
+		newFTC.resize(newMesh.triangles.size(), 3);
+		for (int i = 0; i < newMesh.triangles.size(); i++) for (int k = 0; k < 3; k++) {
+			newFTC(i, k) = newMesh.triangles[i][k];
+		}
+		newFN.resize(newMesh.triangles.size(), 3);
+		for (int i = 0; i < newMesh.triangles.size(); i++) for (int k = 0; k < 3; k++) {
+			newFN(i, k) = 0;
+		}
+		igl::writeOBJ("tmp/outTestRemesh.obj", newV, newF, newN, newFN, newTC, newFTC);
 	}
 
 	imshow("raw", raw);
+	imwrite(imgPath + imgName + "_remesh.png", raw);
 	waitKey();
 
-	int i = 0;
+	/*int i = 0;
 	double nowPos[3][3];
 	double nowUV [3][2];
 
 	for (int k = 0; k < 3; k++) {
 
-		// geometry pos
+		 geometry pos
 		nowPos[k][0] = V(F(i, k), 0);
 		nowPos[k][1] = V(F(i, k), 1);
 		nowPos[k][2] = V(F(i, k), 2);
 
-		// UV pos
+		 UV pos
 		nowUV[k][0] = TC(FTC(i, k), 0);
 		nowUV[k][1] = TC(FTC(i, k), 1);
 	}
 
-	// subdivision grid
+	 subdivision grid
 
 	double newPos[3][3];
 	double newUV[3][2];
 
 	for (int k = 0; k < 3; k++) {
 
-		// geometry pos
+		 geometry pos
 		newPos[k][0] = (nowPos[k][0] + nowPos[(k + 1) % 3][0]) / 2.0;
 		newPos[k][1] = (nowPos[k][1] + nowPos[(k + 1) % 3][1]) / 2.0;
 		newPos[k][2] = (nowPos[k][2] + nowPos[(k + 1) % 3][2]) / 2.0;
 
-		// UV pos
+		 UV pos
 		newUV[k][0] = (nowUV[k][0] + nowUV[(k + 1) % 3][0]) / 2.0;
 		newUV[k][1] = (nowUV[k][1] + nowUV[(k + 1) % 3][1]) / 2.0;
 	}
@@ -202,7 +353,7 @@ void FeatureRemesh(const char* meshName)
 
 	FN(nowRowF, 0) = FN(nowRowF + 1, 0) = FN(nowRowF + 2, 0) = FN(i, 0);
 	FN(nowRowF, 1) = FN(nowRowF + 1, 1) = FN(nowRowF + 2, 1) = FN(i, 1);
-	FN(nowRowF, 2) = FN(nowRowF + 1, 2) = FN(nowRowF + 2, 2) = FN(i, 2);
+	FN(nowRowF, 2) = FN(nowRowF + 1, 2) = FN(nowRowF + 2, 2) = FN(i, 2);*/
 
 
 
