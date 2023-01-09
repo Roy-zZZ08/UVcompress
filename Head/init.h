@@ -271,14 +271,14 @@ void InitBlocks(Mat src)
         blocks[index]->featureMaskInner = innerMask;
 
         //imshow("idBlockInner" + index, innerMask);
-        //imwrite(imgPath + imgName + "_idBlock" + std::to_string(index) + ".png", idBlock);
+        imwrite(imgPath + imgName + "_idBlockinner" + std::to_string(index) + ".png", innerMask);
         //waitKey();
         
         dilate(idBlock, outerMask, Mat(), cv::Point(-1, -1), 3);
         blocks[index]->featureMaskOuter = outerMask;
 
         //imshow("idBlockOuter" + index, outerMask);
-        //imwrite(imgPath + imgName + "_idBlock" + std::to_string(index) + ".png", idBlock);
+        imwrite(imgPath + imgName + "_idBlockouter" + std::to_string(index) + ".png", outerMask);
         //waitKey();
 
         
@@ -595,11 +595,10 @@ void InitKlt()
     src = imread(imgPath + imgName + ".jpg", 1);
     InitBlocks(src); 
 
-    //for (int bIndex = 0; bIndex < blocks.size(); bIndex++) {
-    //    cout << "new feature track id: " << bIndex << endl;
-    //    if(bIndex==0)
-    //    doKlt(bIndex);
-    //}
+    for (int bIndex = 0; bIndex < blocks.size(); bIndex++) {
+        cout << "new feature track id: " << bIndex << endl;
+        doKlt(bIndex);
+    }
 
  }
 

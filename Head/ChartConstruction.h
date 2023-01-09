@@ -674,11 +674,12 @@ void Initialize
 	Image< int >& triangleID,
 	Image< Point2D< double > >& barycentricCoords,
 	Image< Point3D< float > > & patchImg,
-	std::vector< AtlasChart >& atlasCharts
+	std::vector< AtlasChart >& atlasCharts,
+	std::vector< int > &oppositeHalfEdge
 )
 {
 	AtlasMesh atlasMesh;
-	std::vector< int > oppositeHalfEdge;
+	
 	std::unordered_map< int, int > boundaryVerticesIndices;
 	std::unordered_map< int, Point2D< double > > boundaryVerticesNormal;
 	std::unordered_map< int, class OppositeCoord > oppositeCoord;
@@ -752,8 +753,8 @@ void Initialize
 					Point2D< double > barycentricCoord = barycentricMap * texelPos;
 					if (barycentricCoord[0] >= 0 && barycentricCoord[1] >= 0 && (barycentricCoord[0] + barycentricCoord[1]) <= 1)
 					{
-						if (nodeType(i, j) != -1)
-							Miscellany::Throw("Node ( %d , %d ) in chart %d already covered", i, j, index);
+						//if (nodeType(i, j) != -1)
+							//printf("Node ( %d , %d ) in chart %d already covered\n", i, j, index);
 
 						nodeType(i, j) = 1;
 						triangleID(i, j) = atlasCharts[index].meshTriangleIndices[t];

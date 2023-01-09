@@ -17,6 +17,7 @@ Image< int > travelID;
 Image< int > triangleID;
 Image< Point3D< float > > patchImg;
 Image< Point2D< double > > barycentricCoords;
+vector< int > oppositeHalfEdge;
 
 Mat SobelEdge; 
 

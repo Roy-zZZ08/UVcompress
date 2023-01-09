@@ -45,6 +45,7 @@ public:
     void addInitMatch(Point2f move, double angle, double scale);
 
     vector<Match> initMatchList, finalMatchList;
+    vector<Point2i> newBoundPoints;
     Mat featureMaskInner;
     Mat featureMaskOuter; // ÅòÕÍºóµÄMask
     int index;

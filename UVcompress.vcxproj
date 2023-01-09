@@ -158,7 +158,6 @@
     <ClInclude Include="Head\Atlas.h" />
     <ClInclude Include="Head\base.h" />
     <ClInclude Include="Head\Block.h" />
-    <ClInclude Include="Head\CDTtest.h" />
     <ClInclude Include="Head\ChartConstruction.h" />
     <ClInclude Include="Head\CompressUV.h" />
     <ClInclude Include="Head\convolve.h" />
@@ -170,6 +169,7 @@
     <ClInclude Include="Head\pnmio.h" />
     <ClInclude Include="Head\pyramid.h" />
     <ClInclude Include="Head\Remesh.h" />
+    <ClInclude Include="Head\RemeshMesh.h" />
     <ClInclude Include="Head\TexturedMesh.h" />
     <ClInclude Include="Head\Util.h" />
     <ClInclude Include="Head\ValueDefine.h" />

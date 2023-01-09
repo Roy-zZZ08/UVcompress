@@ -43,6 +43,8 @@ struct Image
 	Image(int w, int h);
 	Image(const Image& img);
 	~Image(void);
+
+	void clear();
 	void resize(int w, int h);
 	void read(const char* fileName);
 	void write(const char* fileName) const;
@@ -76,6 +78,7 @@ template< class Data > Image< Data >::Image(const Image& img) : _width(0), _heig
 	memcpy(_pixels, img._pixels, sizeof(Data) * img.size());
 }
 template< class Data > Image< Data >::~Image(void){ if (_pixels) delete[] _pixels; _pixels = NULL, _width = _height = 0; }
+
 template< class Data >
 template< class Real >
 Data Image< Data >::sample(Real x, Real y) const
@@ -103,6 +106,7 @@ Data Image< Data >::sample(Real x, Real y) const
 		(*this)(ix2, iy2) * (Real)((dx)* (dy));
 #endif
 }
+template< class Data > void Image< Data >::clear(void) { if (_pixels) delete[] _pixels; _pixels = NULL, _width = _height = 0; }
 template< class Data > void Image< Data >::resize(int w, int h)
 {
 	if (_width*_height != w*h)

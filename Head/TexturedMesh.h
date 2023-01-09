@@ -20,7 +20,7 @@ class TexturedMesh
 {
 public: 
 	std::vector< Point3D< double > > vertices;
-	std::vector< Point3D< double > > normals;
+	std::vector< Point3D< double > > normals; // Öð¶¥µã¼ÇÂ¼
 	std::vector< TriangleIndex > triangles;
 	std::vector< Point2D< double > > textureCoordinates;
 	Image< Point3D< float > > texture;
@@ -49,6 +49,7 @@ public:
 				textureCoordinates[3 * i + j] = Point2D< double >(TC(FTC(i, j), 0), TC(FTC(i, j), 1));
 			}
 		}
+
 		updateNormals();
 
 		if (atlasName)
